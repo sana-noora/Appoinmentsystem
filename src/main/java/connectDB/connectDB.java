@@ -3,7 +3,7 @@ import java.sql.*;
 public class connectDB {
 	 public static void main(String[] args) {
 
-	        String url = "jdbc:postgresql://localhost:1234/Appoinment"; 
+	        String url = "jdbc:postgresql://localhost:5432/appointment_system"; 
 	        String user = "postgres"; 
 	        String password = "123456";
 
