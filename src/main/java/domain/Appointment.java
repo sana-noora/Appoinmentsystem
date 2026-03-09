@@ -87,6 +87,9 @@ public Appointment() {
    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt;}
    public OffsetDateTime getUpdatedAt() {return updatedAt;}
    public void setUpdatedAt(OffsetDateTime updatedAt) {this.updatedAt = updatedAt;}
+   public Long getSlotId() { return slotId; }
+   public void setSlotId(Long slotId) { this.slotId = slotId; }
+
 
 @Override
     public String toString() {
