@@ -5,6 +5,7 @@ import persistence.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.List;
+import java.util.Optional;
 import java.util.Scanner;
 
 public class Main {
@@ -20,18 +21,17 @@ public class Main {
             AppointmentDAO appointmentDAO = new AppointmentDAO(conn);
             TimeSlotDAO timeSlotDAO = new TimeSlotDAO(conn);
 
-            // تسجيل الدخول
             System.out.print("Enter username: ");
             String inputUsername = scanner.nextLine();
             System.out.print("Enter password: ");
             String inputPassword = scanner.nextLine();
 
-            User user = userDAO.login(inputUsername, inputPassword);
-
-            if (user == null) {
+            Optional<User> maybeUser = userDAO.login(inputUsername, inputPassword);
+            if (!maybeUser.isPresent()) {
                 System.out.println("❌ Login failed!");
                 return;
             }
+            User user = maybeUser.get();
 
             System.out.println("✅ Welcome " + user.getName() + " (" + user.getRole() + ")");
 
@@ -53,7 +53,14 @@ public class Main {
                 }
 
                 System.out.print("Choose option: ");
-                int choice = Integer.parseInt(scanner.nextLine());
+                String rawChoice = scanner.nextLine();
+                int choice;
+                try {
+                    choice = Integer.parseInt(rawChoice);
+                } catch (NumberFormatException ex) {
+                    System.out.println("Invalid choice.");
+                    continue;
+                }
 
                 if (user.getRole() == User.Role.ADMIN) {
                     Admin admin = new Admin(
@@ -62,92 +69,127 @@ public class Main {
                             user.getEmail(),
                             user.getPhoneNumber(),
                             user.getUsername(),
-                            inputPassword,
+                            null,
                             appointmentDAO,
                             timeSlotDAO
                     );
 
                     switch (choice) {
-                        case 1:
-                            List<TimeSlot> slots = admin.viewAvailableSlots();
-                            slots.forEach(System.out::println);
+                        case 1: {
+                            List<TimeSlot> availSlots = admin.viewAvailableSlots();
+                            availSlots.forEach(System.out::println);
                             break;
-                        case 2:
+                        }
+                        case 2: {
                             List<Appointment> appointments = appointmentDAO.getAllAppointments();
                             appointments.forEach(System.out::println);
                             break;
-                        case 3:
+                        }
+                        case 3: {
                             System.out.print("Enter appointment ID to cancel: ");
-                            long cancelId = Long.parseLong(scanner.nextLine());
-                            admin.cancelAppointment(cancelId);
+                            String raw = scanner.nextLine();
+                            try {
+                                long cancelId = Long.parseLong(raw);
+                                admin.cancelAppointment(cancelId);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid ID.");
+                            }
                             break;
-                        case 4:
+                        }
+                        case 4: {
                             System.out.print("Enter appointment ID to modify: ");
-                            long modifyId = Long.parseLong(scanner.nextLine());
+                            String rawId = scanner.nextLine();
                             System.out.print("Enter new participants count: ");
-                            int newCount = Integer.parseInt(scanner.nextLine());
-                            admin.modifyAppointment(modifyId, newCount);
+                            String rawCount = scanner.nextLine();
+                            try {
+                                long modifyId = Long.parseLong(rawId);
+                                int newCount = Integer.parseInt(rawCount);
+                                admin.modifyAppointment(modifyId, newCount);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid input.");
+                            }
                             break;
-                        case 5:
+                        }
+                        case 5: {
                             user.logout();
                             running = false;
                             System.out.println("👋 Logged out.");
                             break;
+                        }
+                        default:
+                            System.out.println("Invalid choice.");
                     }
                 } else {
                     switch (choice) {
-                        case 1:
-                            // استرجاع مواعيد المستخدم من جدول appointments
+                        case 1: {
                             List<Appointment> myAppointments = appointmentDAO.getAllAppointments();
-                            myAppointments.stream()
-                                    .filter(ap -> ap.getCreatedBy() == Long.parseLong(user.getId()))
-                                    .forEach(System.out::println);
+                            try {
+                                long uid = Long.parseLong(user.getId());
+                                myAppointments.stream()
+                                        .filter(ap -> ap.getCreatedBy() == uid)
+                                        .forEach(System.out::println);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Unable to match your appointments due to ID format.");
+                            }
                             break;
-                        case 2:
-                            List<TimeSlot> slots = timeSlotDAO.getAvailableSlots();
-                            slots.forEach(System.out::println);
+                        }
+                        case 2: {
+                            List<TimeSlot> availSlots = timeSlotDAO.getAvailableSlots();
+                            availSlots.forEach(System.out::println);
                             break;
-                        case 3:
-                            // حجز موعد جديد
+                        }
+                        case 3: {
                             List<TimeSlot> availableSlots = timeSlotDAO.getAvailableSlots();
                             System.out.println("📅 Available Slots:");
                             availableSlots.forEach(System.out::println);
 
                             System.out.print("Enter Slot ID to book: ");
-                            long chosenSlotId = Long.parseLong(scanner.nextLine());
-
+                            String rawSlotId = scanner.nextLine();
                             System.out.print("Enter appointment type (urgent/follow-up/etc): ");
                             String type = scanner.nextLine();
+                            type = type == null ? null : type.trim().toUpperCase();
+                            if (type.equals("FOLLOW-UP") || type.equals("FOLLOWUP")) type = "FOLLOW_UP";
 
                             System.out.print("Enter participants count: ");
-                            int participantsCount = Integer.parseInt(scanner.nextLine());
+                            String rawCount = scanner.nextLine();
 
-                            TimeSlot chosenSlot = timeSlotDAO.getTimeSlotById(chosenSlotId);
-                            if (chosenSlot != null && chosenSlot.isAvailable()) {
-                                Appointment newAppointment = new Appointment(
-                                        type,
-                                        "CONFIRMED",
-                                        chosenSlot.getStartTime(),
-                                        chosenSlot.getEndTime(),
-                                        participantsCount,
-                                        5, // مثال: الحد الأقصى للمشاركين
-                                        Long.parseLong(user.getId()),
-                                        chosenSlotId
-                                );
+                            try {
+                                long chosenSlotId = Long.parseLong(rawSlotId);
+                                int participantsCount = Integer.parseInt(rawCount);
 
-                                appointmentDAO.addAppointment(newAppointment);
-                                timeSlotDAO.updateAvailability(chosenSlotId, false);
+                                TimeSlot chosenSlot = timeSlotDAO.getTimeSlotById(chosenSlotId);
+                                if (chosenSlot != null && chosenSlot.isAvailable()) {
+                                    Appointment newAppointment = new Appointment(
+                                            type,
+                                            "CONFIRMED",
+                                            chosenSlot.getStartTime(),
+                                            chosenSlot.getEndTime(),
+                                            participantsCount,
+                                            5,
+                                            Long.parseLong(user.getId()),
+                                            chosenSlotId
+                                    );
 
-                                System.out.println("✅ Appointment booked successfully!");
-                            } else {
-                                System.out.println("❌ Slot not available!");
+                                    appointmentDAO.addAppointment(newAppointment);
+                                    timeSlotDAO.updateAvailability(chosenSlotId, false);
+
+                                    System.out.println("✅ Appointment booked successfully!");
+                                } else {
+                                    System.out.println("❌ Slot not available!");
+                                }
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid numeric input.");
                             }
                             break;
-                        case 4:
+                        }
+                        case 4: {
                             user.logout();
                             running = false;
                             System.out.println("👋 Logged out.");
                             break;
+                        }
+                        default:
+                            System.out.println("Invalid choice.");
                     }
                 }
             }

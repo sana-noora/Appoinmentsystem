@@ -15,7 +15,7 @@ public class Admin extends User {
     public Admin(String id, String name, String email, String phoneNumber,
                  String username, String plainPassword,
                  AppointmentDAO appointmentDAO, TimeSlotDAO timeSlotDAO) {
-        super(id, name, email, phoneNumber, username, plainPassword, Role.ADMIN);
+        super(id, name, email, phoneNumber, username, Role.ADMIN);
         this.appointmentDAO = appointmentDAO;
         this.timeSlotDAO = timeSlotDAO;
     }
