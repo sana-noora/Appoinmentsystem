@@ -7,7 +7,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class ScheduleDAO {
     private final Connection connection;
 
@@ -15,7 +14,6 @@ public class ScheduleDAO {
         this.connection = connection;
     }
 
-    
     public void addSchedule(Schedule schedule) throws SQLException {
         String sql = "INSERT INTO schedules (work_date, created_at) VALUES (?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -25,7 +23,6 @@ public class ScheduleDAO {
         }
     }
 
-   
     public Schedule getScheduleById(long id) throws SQLException {
         String sql = "SELECT * FROM schedules WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -39,11 +36,9 @@ public class ScheduleDAO {
         return null;
     }
 
-    
-    
     public List<Schedule> getAllSchedules() throws SQLException {
         List<Schedule> schedules = new ArrayList<>();
-        String sql = "SELECT * FROM schedules";
+        String sql = "SELECT * FROM schedules ORDER BY work_date ASC";
         try (PreparedStatement stmt = connection.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
@@ -53,7 +48,6 @@ public class ScheduleDAO {
         return schedules;
     }
 
-   
     public void deleteSchedule(long id) throws SQLException {
         String sql = "DELETE FROM schedules WHERE id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -62,7 +56,6 @@ public class ScheduleDAO {
         }
     }
 
-    
     private Schedule mapResultSetToSchedule(ResultSet rs) throws SQLException {
         return new Schedule(
                 rs.getLong("id"),

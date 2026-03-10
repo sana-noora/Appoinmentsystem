@@ -4,6 +4,10 @@ import domain.*;
 import persistence.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
@@ -20,6 +24,7 @@ public class Main {
             UserDAO userDAO = new UserDAO(conn);
             AppointmentDAO appointmentDAO = new AppointmentDAO(conn);
             TimeSlotDAO timeSlotDAO = new TimeSlotDAO(conn);
+            ScheduleDAO scheduleDAO = new ScheduleDAO(conn);
 
             System.out.print("Enter username: ");
             String inputUsername = scanner.nextLine();
@@ -39,15 +44,18 @@ public class Main {
             while (running) {
                 if (user.getRole() == User.Role.ADMIN) {
                     System.out.println("\n--- Admin Menu ---");
-                    System.out.println("1. View available slots");
-                    System.out.println("2. View all appointments");
-                    System.out.println("3. Cancel appointment");
-                    System.out.println("4. Modify appointment participants");
-                    System.out.println("5. Logout");
+                    System.out.println("1. View work days");
+                    System.out.println("2. Add work day");
+                    System.out.println("3. View available slots by day");
+                    System.out.println("4. Add slot to a work day");
+                    System.out.println("5. View all appointments");
+                    System.out.println("6. Cancel appointment");
+                    System.out.println("7. Modify appointment participants");
+                    System.out.println("8. Logout");
                 } else {
                     System.out.println("\n--- Patient Menu ---");
                     System.out.println("1. View my appointments");
-                    System.out.println("2. View available slots");
+                    System.out.println("2. View available slots by day");
                     System.out.println("3. Book appointment");
                     System.out.println("4. Logout");
                 }
@@ -69,23 +77,84 @@ public class Main {
                             user.getEmail(),
                             user.getPhoneNumber(),
                             user.getUsername(),
-                            null,
                             appointmentDAO,
-                            timeSlotDAO
+                            timeSlotDAO,
+                            scheduleDAO
                     );
 
                     switch (choice) {
                         case 1: {
-                            List<TimeSlot> availSlots = admin.viewAvailableSlots();
-                            availSlots.forEach(System.out::println);
+                            List<Schedule> days = admin.viewWorkDays();
+                            if (days.isEmpty()) {
+                                System.out.println("No work days found.");
+                            } else {
+                                days.forEach(d -> System.out.println(d.getId() + " - " + d.getWorkDate()));
+                            }
                             break;
                         }
                         case 2: {
+                            System.out.print("Enter work day (YYYY-MM-DD): ");
+                            String dateStr = scanner.nextLine();
+                            try {
+                                LocalDate date = LocalDate.parse(dateStr);
+                                admin.addWorkDay(date);
+                                System.out.println("✅ Work day added: " + date);
+                            } catch (Exception ex) {
+                                System.out.println("Invalid date format.");
+                            }
+                            break;
+                        }
+                        case 3: {
+                            System.out.print("Enter schedule ID: ");
+                            String raw = scanner.nextLine();
+                            try {
+                                long scheduleId = Long.parseLong(raw);
+                                List<TimeSlot> slots = admin.viewAvailableSlotsByDay(scheduleId);
+                                if (slots.isEmpty()) System.out.println("No available slots for that day.");
+                                else slots.forEach(System.out::println);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid schedule ID.");
+                            }
+                            break;
+                        }
+                        case 4: {
+                            System.out.print("Enter schedule ID: ");
+                            String rawSid = scanner.nextLine();
+                            System.out.print("Enter start time (HH:mm): ");
+                            String startStr = scanner.nextLine();
+                            System.out.print("Enter end time (HH:mm): ");
+                            String endStr = scanner.nextLine();
+                            try {
+                                long scheduleId = Long.parseLong(rawSid);
+                                Schedule schedule = scheduleDAO.getScheduleById(scheduleId);
+                                if (schedule == null) {
+                                    System.out.println("Schedule not found.");
+                                    break;
+                                }
+                                LocalDate day = schedule.getWorkDate();
+                                LocalTime startTime = LocalTime.parse(startStr);
+                                LocalTime endTime = LocalTime.parse(endStr);
+                                OffsetDateTime start = OffsetDateTime.of(day, startTime, ZoneOffset.UTC);
+                                OffsetDateTime end = OffsetDateTime.of(day, endTime, ZoneOffset.UTC);
+                                if (!end.isAfter(start)) {
+                                    System.out.println("End time must be after start time.");
+                                    break;
+                                }
+                                admin.addSlot(scheduleId, start, end);
+                                System.out.println("✅ Slot added for " + day + " from " + start + " to " + end);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid schedule ID.");
+                            } catch (Exception ex) {
+                                System.out.println("Invalid time format. Use HH:mm");
+                            }
+                            break;
+                        }
+                        case 5: {
                             List<Appointment> appointments = appointmentDAO.getAllAppointments();
                             appointments.forEach(System.out::println);
                             break;
                         }
-                        case 3: {
+                        case 6: {
                             System.out.print("Enter appointment ID to cancel: ");
                             String raw = scanner.nextLine();
                             try {
@@ -96,7 +165,7 @@ public class Main {
                             }
                             break;
                         }
-                        case 4: {
+                        case 7: {
                             System.out.print("Enter appointment ID to modify: ");
                             String rawId = scanner.nextLine();
                             System.out.print("Enter new participants count: ");
@@ -110,7 +179,7 @@ public class Main {
                             }
                             break;
                         }
-                        case 5: {
+                        case 8: {
                             user.logout();
                             running = false;
                             System.out.println("👋 Logged out.");
@@ -127,6 +196,7 @@ public class Main {
                                 long uid = Long.parseLong(user.getId());
                                 myAppointments.stream()
                                         .filter(ap -> ap.getCreatedBy() == uid)
+                                        .sorted((a, b) -> a.getStartTime().compareTo(b.getStartTime()))
                                         .forEach(System.out::println);
                             } catch (NumberFormatException ex) {
                                 System.out.println("Unable to match your appointments due to ID format.");
@@ -134,21 +204,60 @@ public class Main {
                             break;
                         }
                         case 2: {
-                            List<TimeSlot> availSlots = timeSlotDAO.getAvailableSlots();
-                            availSlots.forEach(System.out::println);
+                            List<Schedule> schedules = scheduleDAO.getAllSchedules();
+                            if (schedules.isEmpty()) {
+                                System.out.println("No work days available.");
+                                break;
+                            }
+                            System.out.println("Work days:");
+                            schedules.forEach(d -> System.out.println(d.getId() + " - " + d.getWorkDate()));
+
+                            System.out.print("Choose a schedule ID: ");
+                            String rawDay = scanner.nextLine();
+                            try {
+                                long scheduleId = Long.parseLong(rawDay);
+                                List<TimeSlot> slots = timeSlotDAO.getAvailableSlotsByScheduleId(scheduleId);
+                                if (slots.isEmpty()) System.out.println("No available slots for that day.");
+                                else slots.forEach(System.out::println);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid schedule ID.");
+                            }
                             break;
                         }
                         case 3: {
-                            List<TimeSlot> availableSlots = timeSlotDAO.getAvailableSlots();
+                            List<Schedule> schedules = scheduleDAO.getAllSchedules();
+                            if (schedules.isEmpty()) {
+                                System.out.println("No work days available.");
+                                break;
+                            }
+                            System.out.println("Work days:");
+                            schedules.forEach(d -> System.out.println(d.getId() + " - " + d.getWorkDate()));
+
+                            System.out.print("Choose a schedule ID: ");
+                            String rawDay = scanner.nextLine();
+                            long scheduleId;
+                            try {
+                                scheduleId = Long.parseLong(rawDay);
+                            } catch (NumberFormatException ex) {
+                                System.out.println("Invalid schedule ID.");
+                                break;
+                            }
+
+                            List<TimeSlot> availableSlots = timeSlotDAO.getAvailableSlotsByScheduleId(scheduleId);
+                            if (availableSlots.isEmpty()) {
+                                System.out.println("No available slots for that day.");
+                                break;
+                            }
+
                             System.out.println("📅 Available Slots:");
                             availableSlots.forEach(System.out::println);
 
                             System.out.print("Enter Slot ID to book: ");
                             String rawSlotId = scanner.nextLine();
-                            System.out.print("Enter appointment type (urgent/follow-up/etc): ");
+                            System.out.print("Enter appointment type (e.g., URGENT/FOLLOW_UP/ASSESSMENT/VIRTUAL/IN_PERSON/INDIVIDUAL/GROUP): ");
                             String type = scanner.nextLine();
                             type = type == null ? null : type.trim().toUpperCase();
-                            if (type.equals("FOLLOW-UP") || type.equals("FOLLOWUP")) type = "FOLLOW_UP";
+                            if ("FOLLOW-UP".equals(type) || "FOLLOWUP".equals(type)) type = "FOLLOW_UP";
 
                             System.out.print("Enter participants count: ");
                             String rawCount = scanner.nextLine();
