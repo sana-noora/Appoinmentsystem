@@ -1,61 +1,160 @@
 package main;
 
-import java.sql.*;
-import java.time.OffsetDateTime;
-
+import domain.*;
+import persistence.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.List;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
         String url = "jdbc:postgresql://localhost:5432/appointment_system";
-        String user = "postgres";
-        String password = "123456";
+        String dbUser = "postgres";
+        String dbPassword = "123456";
 
-        try (Connection conn = DriverManager.getConnection(url, user, password)) {
-            System.out.println("Connected to PostgreSQL successfully!");
+        try (Connection conn = DriverManager.getConnection(url, dbUser, dbPassword)) {
+            UserDAO userDAO = new UserDAO(conn);
+            AppointmentDAO appointmentDAO = new AppointmentDAO(conn);
+            TimeSlotDAO timeSlotDAO = new TimeSlotDAO(conn);
 
-            String sql = "\r\n"
-            		+ "  SELECT id,\r\n"
-            		+ "                   type,\r\n"
-            		+ "                   status,\r\n"
-            		+ "                   start_time,\r\n"
-            		+ "                   end_time,\r\n"
-            		+ "                   participants_count,\r\n"
-            		+ "                   max_participants,\r\n"
-            		+ "                   created_by,\r\n"
-            		+ "                   slot_id\r\n"
-            		+ "            FROM appointments\r\n"
-            		+ "            ORDER BY id ASC\r\n"
-            		+ "";
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(sql);
+            // تسجيل الدخول
+            System.out.print("Enter username: ");
+            String inputUsername = scanner.nextLine();
+            System.out.print("Enter password: ");
+            String inputPassword = scanner.nextLine();
 
-            while (rs.next()) {
+            User user = userDAO.login(inputUsername, inputPassword);
 
-            	   long id = rs.getLong("id");
-            	                String type = rs.getString("type");
-            	                String status = rs.getString("status");
-            	                OffsetDateTime start = rs.getObject("start_time", OffsetDateTime.class);
-            	                OffsetDateTime end   = rs.getObject("end_time", OffsetDateTime.class);
-            	                int participants = rs.getInt("participants_count");
-            	                int maxParticipants = rs.getInt("max_participants");
-            	                long createdBy = rs.getLong("created_by");
-            	                Long slotId = rs.getObject("slot_id") == null ? null : rs.getLong("slot_id");
+            if (user == null) {
+                System.out.println("❌ Login failed!");
+                return;
+            }
 
-            	                System.out.println(
-            	                        String.format(
-            	                                "id=%d | type=%s | status=%s | start=%s | end=%s | participants=%d/%d | created_by=%d | slot_id=%s",
-            	                                id, type, status,
-            	                                start, end,
-            	                                participants, maxParticipants,
-            	                                createdBy,
-            	                                (slotId == null ? "NULL" : slotId.toString())
-            	                        )
-            	                );
+            System.out.println("✅ Welcome " + user.getName() + " (" + user.getRole() + ")");
 
+            boolean running = true;
+            while (running) {
+                if (user.getRole() == User.Role.ADMIN) {
+                    System.out.println("\n--- Admin Menu ---");
+                    System.out.println("1. View available slots");
+                    System.out.println("2. View all appointments");
+                    System.out.println("3. Cancel appointment");
+                    System.out.println("4. Modify appointment participants");
+                    System.out.println("5. Logout");
+                } else {
+                    System.out.println("\n--- Patient Menu ---");
+                    System.out.println("1. View my appointments");
+                    System.out.println("2. View available slots");
+                    System.out.println("3. Book appointment");
+                    System.out.println("4. Logout");
+                }
+
+                System.out.print("Choose option: ");
+                int choice = Integer.parseInt(scanner.nextLine());
+
+                if (user.getRole() == User.Role.ADMIN) {
+                    Admin admin = new Admin(
+                            user.getId(),
+                            user.getName(),
+                            user.getEmail(),
+                            user.getPhoneNumber(),
+                            user.getUsername(),
+                            inputPassword,
+                            appointmentDAO,
+                            timeSlotDAO
+                    );
+
+                    switch (choice) {
+                        case 1:
+                            List<TimeSlot> slots = admin.viewAvailableSlots();
+                            slots.forEach(System.out::println);
+                            break;
+                        case 2:
+                            List<Appointment> appointments = appointmentDAO.getAllAppointments();
+                            appointments.forEach(System.out::println);
+                            break;
+                        case 3:
+                            System.out.print("Enter appointment ID to cancel: ");
+                            long cancelId = Long.parseLong(scanner.nextLine());
+                            admin.cancelAppointment(cancelId);
+                            break;
+                        case 4:
+                            System.out.print("Enter appointment ID to modify: ");
+                            long modifyId = Long.parseLong(scanner.nextLine());
+                            System.out.print("Enter new participants count: ");
+                            int newCount = Integer.parseInt(scanner.nextLine());
+                            admin.modifyAppointment(modifyId, newCount);
+                            break;
+                        case 5:
+                            user.logout();
+                            running = false;
+                            System.out.println("👋 Logged out.");
+                            break;
+                    }
+                } else {
+                    switch (choice) {
+                        case 1:
+                            // استرجاع مواعيد المستخدم من جدول appointments
+                            List<Appointment> myAppointments = appointmentDAO.getAllAppointments();
+                            myAppointments.stream()
+                                    .filter(ap -> ap.getCreatedBy() == Long.parseLong(user.getId()))
+                                    .forEach(System.out::println);
+                            break;
+                        case 2:
+                            List<TimeSlot> slots = timeSlotDAO.getAvailableSlots();
+                            slots.forEach(System.out::println);
+                            break;
+                        case 3:
+                            // حجز موعد جديد
+                            List<TimeSlot> availableSlots = timeSlotDAO.getAvailableSlots();
+                            System.out.println("📅 Available Slots:");
+                            availableSlots.forEach(System.out::println);
+
+                            System.out.print("Enter Slot ID to book: ");
+                            long chosenSlotId = Long.parseLong(scanner.nextLine());
+
+                            System.out.print("Enter appointment type (urgent/follow-up/etc): ");
+                            String type = scanner.nextLine();
+
+                            System.out.print("Enter participants count: ");
+                            int participantsCount = Integer.parseInt(scanner.nextLine());
+
+                            TimeSlot chosenSlot = timeSlotDAO.getTimeSlotById(chosenSlotId);
+                            if (chosenSlot != null && chosenSlot.isAvailable()) {
+                                Appointment newAppointment = new Appointment(
+                                        type,
+                                        "CONFIRMED",
+                                        chosenSlot.getStartTime(),
+                                        chosenSlot.getEndTime(),
+                                        participantsCount,
+                                        5, // مثال: الحد الأقصى للمشاركين
+                                        Long.parseLong(user.getId()),
+                                        chosenSlotId
+                                );
+
+                                appointmentDAO.addAppointment(newAppointment);
+                                timeSlotDAO.updateAvailability(chosenSlotId, false);
+
+                                System.out.println("✅ Appointment booked successfully!");
+                            } else {
+                                System.out.println("❌ Slot not available!");
+                            }
+                            break;
+                        case 4:
+                            user.logout();
+                            running = false;
+                            System.out.println("👋 Logged out.");
+                            break;
+                    }
+                }
             }
         } catch (Exception e) {
-            System.out.println("Connection failed!");
             e.printStackTrace();
         }
+
+        scanner.close();
     }
 }
