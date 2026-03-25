@@ -35,7 +35,7 @@ class AppointmentDAOTest {
 	    }
 
 	    @Test
-	       void addAppointment_shouldExecuteInsert() throws Exception {
+	       void addAppointment() throws Exception {
 
 	           when(connection.prepareStatement(anyString()))
 	                   .thenReturn(preparedStatement);
@@ -132,7 +132,7 @@ void getAppointmentById_shouldReturnAppointment() throws Exception {
     }
 
 @Test
-  void updateStatus_shouldUpdateSuccessfully() throws Exception {
+  void updateStatus() throws Exception {
 
       when(connection.prepareStatement(anyString()))
               .thenReturn(preparedStatement);
@@ -159,7 +159,7 @@ void updateStatus_shouldThrowExceptionForInvalidStatus() {
     );
 }
 @Test
-   void deleteAppointment_shouldDeleteRow() throws Exception {
+   void deleteAppointment() throws Exception {
 
        when(connection.prepareStatement(anyString()))
                .thenReturn(preparedStatement);
@@ -170,7 +170,7 @@ void updateStatus_shouldThrowExceptionForInvalidStatus() {
    }
 
 @Test
-void getAllAppointments_shouldReturnListOfAppointments() throws Exception {
+void getAllAppointments() throws Exception {
 
     when(connection.prepareStatement(anyString()))
             .thenReturn(preparedStatement);
@@ -217,7 +217,7 @@ void updateStatus_shouldExecuteUpdate() throws Exception {
     verify(preparedStatement).executeUpdate();
 }
 @Test
-void updateParticipants_shouldUpdateCount() throws Exception {
+void updateParticipants() throws Exception {
 
     when(connection.prepareStatement(anyString()))
             .thenReturn(preparedStatement);
