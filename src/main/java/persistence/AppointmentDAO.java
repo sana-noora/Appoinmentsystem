@@ -1,132 +1,441 @@
 package persistence;
 
 import domain.Appointment;
+
 import java.sql.*;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Data Access Object for {@link Appointment} entities.
+ *
+ * <p>Handles all database operations for the {@code appointments} table,
+ * including insert, query, status updates, participant updates, type updates,
+ * slot rescheduling, admin-note writes, and automatic marking of past
+ * appointments as {@code DONE}.</p>
+ *
+ * <p>All appointment-type and status strings are normalized through private
+ * helper methods before being sent to the database, so callers can safely
+ * pass the constants defined in {@link Appointment}.</p>
+ *
+ * @author Student
+ * @version 1.0
+ */
 public class AppointmentDAO {
+
     private final Connection connection;
 
+    /**
+     * Constructs an AppointmentDAO backed by the given JDBC connection.
+     *
+     * @param connection active connection to the PostgreSQL database
+     */
     public AppointmentDAO(Connection connection) {
         this.connection = connection;
     }
 
+    /**
+     * Marks every CONFIRMED or PENDING appointment whose end_time is in the
+     * past as DONE. Call once at application startup.
+     *
+     * @throws SQLException if a database error occurs
+     */
+    public void markPastAppointmentsDone() throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET status='DONE'::booking_status, updated_at=? " +
+                     "WHERE end_time < NOW() AND status IN ('CONFIRMED','PENDING')";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setObject(1, OffsetDateTime.now());
+            int rows = s.executeUpdate();
+            if (rows > 0)
+                System.out.println("[INFO] " + rows + " past appointment(s) marked DONE.");
+        }
+    }
+
+    /**
+     * Inserts a new appointment. created_at and updated_at are set automatically.
+     *
+     * @param appointment appointment to persist (id field is ignored)
+     * @throws SQLException if a database error occurs
+     */
     public void addAppointment(Appointment appointment) throws SQLException {
         String sql = "INSERT INTO appointments " +
-                     "(type, status, start_time, end_time, participants_count, max_participants, created_by, slot_id, created_at, updated_at) " +
-                     "VALUES (?::appointment_type, ?::booking_status, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, normalizeAppointmentType(appointment.getType()));
-            stmt.setString(2, normalizeStatus(appointment.getStatus()));
-            stmt.setObject(3, appointment.getStartTime());
-            stmt.setObject(4, appointment.getEndTime());
-            stmt.setInt(5, appointment.getParticipantsCount());
-            stmt.setInt(6, appointment.getMaxParticipants());
-            stmt.setLong(7, appointment.getCreatedBy());
-            stmt.setObject(8, appointment.getSlotId());
-            stmt.setObject(9, OffsetDateTime.now());
-            stmt.setObject(10, OffsetDateTime.now());
-            stmt.executeUpdate();
+                     "(type,status,start_time,end_time,participants_count," +
+                     " max_participants,created_by,slot_id,created_at,updated_at) " +
+                     "VALUES(?::appointment_type,?::booking_status,?,?,?,?,?,?,?,?)";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, normalizeType(appointment.getType()));
+            s.setString(2, normalizeStatus(appointment.getStatus()));
+            s.setObject(3, appointment.getStartTime());
+            s.setObject(4, appointment.getEndTime());
+            s.setInt(5, appointment.getParticipantsCount());
+            s.setInt(6, appointment.getMaxParticipants());
+            s.setInt(7, (int) appointment.getCreatedBy());
+            if (appointment.getSlotId() != null)
+                s.setLong(8, appointment.getSlotId());
+            else
+                s.setNull(8, Types.BIGINT);
+            s.setObject(9, OffsetDateTime.now());
+            s.setObject(10, OffsetDateTime.now());
+            s.executeUpdate();
         }
     }
 
+    /**
+     * Retrieves a single appointment by primary key.
+     *
+     * @param id appointment ID
+     * @return the matching Appointment, or null if not found
+     * @throws SQLException if a database error occurs
+     */
     public Appointment getAppointmentById(long id) throws SQLException {
-        String sql = "SELECT * FROM appointments WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setLong(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToAppointment(rs);
-                }
+        String sql = "SELECT * FROM appointments WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setLong(1, id);
+            try (ResultSet rs = s.executeQuery()) {
+                return rs.next() ? map(rs) : null;
             }
         }
-        return null;
     }
 
+    /**
+     * Returns all appointments ordered by start_time ascending.
+     *
+     * @return list of all appointments
+     * @throws SQLException if a database error occurs
+     */
     public List<Appointment> getAllAppointments() throws SQLException {
-        List<Appointment> appointments = new ArrayList<>();
-        String sql = "SELECT * FROM appointments";
-        try (PreparedStatement stmt = connection.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                appointments.add(mapResultSetToAppointment(rs));
+        List<Appointment> list = new ArrayList<>();
+        String sql = "SELECT * FROM appointments ORDER BY start_time ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql);
+             ResultSet rs = s.executeQuery()) {
+            while (rs.next()) list.add(map(rs));
+        }
+        return list;
+    }
+
+    /**
+     * Returns active (CONFIRMED/PENDING) appointments for a specific work day.
+     * Excludes DONE and CANCELED appointments.
+     *
+     * @param date the work day date
+     * @return list of active appointments on that day
+     * @throws SQLException if a database error occurs
+     */
+    public List<Appointment> getActiveAppointmentsByDate(LocalDate date) throws SQLException {
+        List<Appointment> list = new ArrayList<>();
+        String sql = "SELECT a.* FROM appointments a " +
+                     "WHERE DATE(a.start_time AT TIME ZONE 'UTC') = ? " +
+                     "  AND a.status IN ('CONFIRMED','PENDING') " +
+                     "ORDER BY a.start_time ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setObject(1, date);
+            try (ResultSet rs = s.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
             }
         }
-        return appointments;
+        return list;
     }
 
-    public void updateStatus(long appointmentId, String newStatus) throws SQLException {
-        String sql = "UPDATE appointments SET status = ?::booking_status, updated_at = ? WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, normalizeStatus(newStatus));
-            stmt.setObject(2, OffsetDateTime.now());
-            stmt.setLong(3, appointmentId);
-            stmt.executeUpdate();
+    /**
+     * Returns future active appointments for a specific work day.
+     *
+     * @param date the work day date
+     * @return list of future CONFIRMED appointments on that day
+     * @throws SQLException if a database error occurs
+     */
+    public List<Appointment> getFutureAppointmentsByDate(LocalDate date) throws SQLException {
+        List<Appointment> list = new ArrayList<>();
+        String sql = "SELECT a.* FROM appointments a " +
+                     "WHERE DATE(a.start_time AT TIME ZONE 'UTC') = ? " +
+                     "  AND a.start_time > NOW() " +
+                     "  AND a.status IN ('CONFIRMED','PENDING') " +
+                     "ORDER BY a.start_time ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setObject(1, date);
+            try (ResultSet rs = s.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Returns all appointments for a specific user, ordered by start_time.
+     *
+     * @param userId numeric user ID
+     * @return list of appointments for that user
+     * @throws SQLException if a database error occurs
+     */
+    public List<Appointment> getAppointmentsByUser(long userId) throws SQLException {
+        List<Appointment> list = new ArrayList<>();
+        // FIX: use setInt since created_by is INTEGER in DB
+        String sql = "SELECT * FROM appointments WHERE created_by=? ORDER BY start_time ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setInt(1, (int) userId);
+            try (ResultSet rs = s.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Updates only the status of an appointment.
+     *
+     * @param id        appointment ID
+     * @param newStatus STATUS_* constant
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateStatus(long id, String newStatus) throws SQLException {
+        String sql = "UPDATE appointments SET status=?::booking_status,updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, normalizeStatus(newStatus));
+            s.setObject(2, OffsetDateTime.now());
+            s.setLong(3, id);
+            return s.executeUpdate();
         }
     }
 
-    public void updateParticipants(long appointmentId, int newCount) throws SQLException {
-        String sql = "UPDATE appointments SET participants_count = ?, updated_at = ? WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, newCount);
-            stmt.setObject(2, OffsetDateTime.now());
-            stmt.setLong(3, appointmentId);
-            stmt.executeUpdate();
+    /**
+     * Cancels an appointment by admin: sets status=CANCELED, stores note,
+     * sets canceled_by_admin=TRUE.
+     *
+     * @param id   appointment ID
+     * @param note admin reason (may be null)
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int cancelByAdmin(long id, String note) throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET status='CANCELED'::booking_status, " +
+                     "    admin_note=?, canceled_by_admin=TRUE, updated_at=? " +
+                     "WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, note);
+            s.setObject(2, OffsetDateTime.now());
+            s.setLong(3, id);
+            return s.executeUpdate();
         }
     }
 
-    public void deleteAppointment(long appointmentId) throws SQLException {
-        String sql = "DELETE FROM appointments WHERE id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setLong(1, appointmentId);
-            stmt.executeUpdate();
+    /**
+     * Updates status and sets an admin note.
+     *
+     * @param id        appointment ID
+     * @param newStatus STATUS_* constant
+     * @param note      admin note
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateStatusAndNote(long id, String newStatus, String note) throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET status=?::booking_status,admin_note=?,updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, normalizeStatus(newStatus));
+            s.setString(2, note);
+            s.setObject(3, OffsetDateTime.now());
+            s.setLong(4, id);
+            return s.executeUpdate();
         }
     }
 
-    private Appointment mapResultSetToAppointment(ResultSet rs) throws SQLException {
-        return new Appointment(
+    /**
+     * Updates participant count only (for visitor edits on Group appointments).
+     * FIX: also updates max_participants so the DB chk_cap constraint is not violated
+     * when participants_count exceeds the old max_participants value.
+     *
+     * @param id       appointment ID
+     * @param newCount new participant count (1-5)
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateParticipants(long id, int newCount) throws SQLException {
+        // Update both participants_count AND max_participants so chk_cap is satisfied.
+        // max_participants for group is always MAX_GROUP (5).
+        String sql = "UPDATE appointments " +
+                     "SET participants_count=?, max_participants=GREATEST(max_participants,?), " +
+                     "    updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setInt(1, newCount);
+            s.setInt(2, newCount);   // ensures max_participants >= participants_count
+            s.setObject(3, OffsetDateTime.now());
+            s.setLong(4, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
+     * Updates participant count and sets an admin note.
+     * Also fixes max_participants to avoid chk_cap violation.
+     *
+     * @param id       appointment ID
+     * @param newCount new participant count
+     * @param note     admin note
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateParticipantsAndNote(long id, int newCount, String note) throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET participants_count=?, max_participants=GREATEST(max_participants,?), " +
+                     "    admin_note=?, updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setInt(1, newCount);
+            s.setInt(2, newCount);
+            s.setString(3, note);
+            s.setObject(4, OffsetDateTime.now());
+            s.setLong(5, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
+     * Updates appointment type and optionally sets an admin note.
+     * When switching from Individual to Group, also sets max_participants=5.
+     *
+     * @param id      appointment ID
+     * @param newType TYPE_* constant
+     * @param note    admin note (may be null)
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateTypeAndNote(long id, String newType, String note) throws SQLException {
+        String normalized = normalizeType(newType);
+        boolean isGroup = normalized.startsWith("GROUP_");
+        String sql = "UPDATE appointments " +
+                     "SET type=?::appointment_type, " +
+                     "    max_participants=?, " +
+                     "    participants_count=CASE WHEN participants_count > ? THEN ? ELSE participants_count END, " +
+                     "    admin_note=?, updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            int maxP = isGroup ? 5 : 1;
+            s.setString(1, normalized);
+            s.setInt(2, maxP);
+            s.setInt(3, maxP);
+            s.setInt(4, maxP);
+            s.setString(5, note);
+            s.setObject(6, OffsetDateTime.now());
+            s.setLong(7, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
+     * Updates appointment type only (for visitor edits).
+     * When switching from Individual to Group, also sets max_participants=5.
+     * When switching from Group to Individual, resets participants_count=1, max_participants=1.
+     *
+     * @param id      appointment ID
+     * @param newType TYPE_* constant
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateType(long id, String newType) throws SQLException {
+        String normalized = normalizeType(newType);
+        boolean isGroup = normalized.startsWith("GROUP_");
+        int maxP = isGroup ? 5 : 1;
+        String sql = "UPDATE appointments " +
+                     "SET type=?::appointment_type, " +
+                     "    max_participants=?, " +
+                     "    participants_count=CASE WHEN participants_count > ? THEN ? ELSE participants_count END, " +
+                     "    updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, normalized);
+            s.setInt(2, maxP);
+            s.setInt(3, maxP);
+            s.setInt(4, maxP);
+            s.setObject(5, OffsetDateTime.now());
+            s.setLong(6, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
+     * Reschedules to a different slot.
+     *
+     * @param id        appointment ID
+     * @param newSlotId new time slot ID
+     * @param newStart  new start time
+     * @param newEnd    new end time
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateSlotAndTime(long id, long newSlotId,
+                                  OffsetDateTime newStart, OffsetDateTime newEnd)
+            throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET slot_id=?,start_time=?,end_time=?,updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setLong(1, newSlotId);
+            s.setObject(2, newStart);
+            s.setObject(3, newEnd);
+            s.setObject(4, OffsetDateTime.now());
+            s.setLong(5, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
+     * Permanently deletes an appointment record.
+     *
+     * @param id appointment ID
+     * @throws SQLException if a database error occurs
+     */
+    public void deleteAppointment(long id) throws SQLException {
+        String sql = "DELETE FROM appointments WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setLong(1, id);
+            s.executeUpdate();
+        }
+    }
+
+    // ── private helpers ──────────────────────────────────────────────
+
+    private Appointment map(ResultSet rs) throws SQLException {
+        Appointment a = new Appointment(
                 rs.getLong("id"),
                 rs.getString("type"),
                 rs.getString("status"),
-                rs.getObject("start_time", java.time.OffsetDateTime.class),
-                rs.getObject("end_time", java.time.OffsetDateTime.class),
+                rs.getObject("start_time", OffsetDateTime.class),
+                rs.getObject("end_time",   OffsetDateTime.class),
                 rs.getInt("participants_count"),
                 rs.getInt("max_participants"),
-                rs.getLong("created_by"),
+                rs.getInt("created_by"),
                 rs.getObject("slot_id", Long.class),
-                rs.getObject("created_at", java.time.OffsetDateTime.class),
-                rs.getObject("updated_at", java.time.OffsetDateTime.class)
-        );
+                rs.getString("admin_note"),
+                rs.getObject("created_at", OffsetDateTime.class),
+                rs.getObject("updated_at", OffsetDateTime.class));
+        a.setCanceledByAdmin(rs.getBoolean("canceled_by_admin"));
+        return a;
     }
 
-    private String normalizeAppointmentType(String input) {
+    private String normalizeType(String input) {
         if (input == null) return null;
-        String v = input.trim().toUpperCase();
+        String v = input.trim().toUpperCase().replace('-','_').replace(' ','_');
         switch (v) {
-            case "URGENT":
+            case "FIRST_VISIT":       return "FIRST_VISIT";
             case "FOLLOW_UP":
-            case "GROUP":
-                return v;
-            default:
-                if (v.equals("FOLLOW-UP")) return "FOLLOW_UP";
-                if (v.equals("FOLLOWUP")) return "FOLLOW_UP";
-                throw new IllegalArgumentException("Unsupported appointment type: " + input);
+            case "FOLLOWUP":          return "FOLLOW_UP";
+            case "VIRTUAL":           return "VIRTUAL";
+            case "GROUP_FIRST_VISIT": return "GROUP_FIRST_VISIT";
+            case "GROUP_FOLLOW_UP":   return "GROUP_FOLLOW_UP";
+            case "GROUP_VIRTUAL":     return "GROUP_VIRTUAL";
+            default: throw new IllegalArgumentException("Unknown type: " + input);
         }
     }
 
     private String normalizeStatus(String input) {
         if (input == null) return null;
-        String v = input.trim().toUpperCase();
-        switch (v) {
-            case "PENDING":
-            case "CONFIRMED":
+        switch (input.trim().toUpperCase()) {
+            case "PENDING":   return "PENDING";
+            case "CONFIRMED": return "CONFIRMED";
             case "CANCELED":
-                return v;
-            default:
-                throw new IllegalArgumentException("Unsupported status: " + input);
+            case "CANCELLED": return "CANCELED";
+            case "DONE":      return "DONE";
+            default: throw new IllegalArgumentException("Unknown status: " + input);
         }
     }
 }

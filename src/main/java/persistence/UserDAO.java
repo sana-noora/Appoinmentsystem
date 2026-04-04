@@ -4,76 +4,74 @@ import domain.User;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class UserDAO {
+
     private final Connection connection;
 
-    public UserDAO(Connection connection) {
-        this.connection = connection;
-    }
+    public UserDAO(Connection connection) { this.connection = connection; }
 
     public void addUser(User user, String rawPassword) throws SQLException {
-        String sql = "INSERT INTO users (id, name, email, phone_number, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?, ?)";
-
-        String passwordHash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, user.getId());
-            stmt.setString(2, user.getName());
-            stmt.setString(3, user.getEmail());
-            stmt.setString(4, user.getPhoneNumber());
-            stmt.setString(5, user.getUsername());
-            stmt.setString(6, passwordHash);
-            stmt.setString(7, user.getRole().name());
-            stmt.executeUpdate();
+        String sql = "INSERT INTO users(name,email,phone_number,username,password_hash,role) " +
+                     "VALUES(?,?,?,?,?,?)";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, user.getName());
+            s.setString(2, user.getEmail());
+            s.setString(3, user.getPhoneNumber());
+            s.setString(4, user.getUsername());
+            s.setString(5, BCrypt.hashpw(rawPassword, BCrypt.gensalt()));
+            s.setString(6, user.getRole().name());
+            s.executeUpdate();
         }
     }
 
     public Optional<User> login(String username, String plainPassword) throws SQLException {
-        String sql = "SELECT id, name, email, phone_number, username, password_hash, role FROM users WHERE username = ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, username);
-
-            try (ResultSet rs = stmt.executeQuery()) {
+        String sql = "SELECT * FROM users WHERE username = ?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setString(1, username);
+            try (ResultSet rs = s.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
-
-                String hashed = rs.getString("password_hash");
-                if (!BCrypt.checkpw(plainPassword, hashed)) return Optional.empty();
-
-                User user = new User(
-                        rs.getString("id"),
-                        rs.getString("name"),
-                        rs.getString("email"),
-                        rs.getString("phone_number"),
-                        rs.getString("username"),
-                        User.Role.valueOf(rs.getString("role"))
-                );
-                user.markLoggedIn();
-                return Optional.of(user);
+                if (!BCrypt.checkpw(plainPassword, rs.getString("password_hash")))
+                    return Optional.empty();
+                User u = mapUser(rs);
+                u.markLoggedIn();
+                return Optional.of(u);
             }
         }
     }
 
+    // FIX: id column is INTEGER (SERIAL), must use setInt not setString
     public Optional<User> getUserById(String id) throws SQLException {
-        String sql = "SELECT id, name, email, phone_number, username, role FROM users WHERE id = ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setInt(1, Integer.parseInt(id));
+            try (ResultSet rs = s.executeQuery()) {
                 if (!rs.next()) return Optional.empty();
-
-                User user = new User(
-                        rs.getString("id"),
-                        rs.getString("name"),
-                        rs.getString("email"),
-                        rs.getString("phone_number"),
-                        rs.getString("username"),
-                        User.Role.valueOf(rs.getString("role"))
-                );
-                return Optional.of(user);
+                return Optional.of(mapUser(rs));
             }
         }
+    }
+
+    public List<User> getAllUsers() throws SQLException {
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT * FROM users ORDER BY id ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql);
+             ResultSet rs = s.executeQuery()) {
+            while (rs.next()) list.add(mapUser(rs));
+        }
+        return list;
+    }
+
+    private User mapUser(ResultSet rs) throws SQLException {
+        return new User(
+                String.valueOf(rs.getInt("id")),
+                rs.getString("name"),
+                rs.getString("email"),
+                rs.getString("phone_number"),
+                rs.getString("username"),
+                User.Role.valueOf(rs.getString("role")));
     }
 }

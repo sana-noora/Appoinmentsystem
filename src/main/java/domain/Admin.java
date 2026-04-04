@@ -17,20 +17,21 @@ public class Admin extends User {
 
     public Admin(String id, String name, String email, String phoneNumber,
                  String username,
-                 AppointmentDAO appointmentDAO, TimeSlotDAO timeSlotDAO, ScheduleDAO scheduleDAO) {
+                 AppointmentDAO appointmentDAO,
+                 TimeSlotDAO timeSlotDAO,
+                 ScheduleDAO scheduleDAO) {
         super(id, name, email, phoneNumber, username, Role.ADMIN);
         this.appointmentDAO = appointmentDAO;
-        this.timeSlotDAO = timeSlotDAO;
-        this.scheduleDAO = scheduleDAO;
+        this.timeSlotDAO    = timeSlotDAO;
+        this.scheduleDAO    = scheduleDAO;
     }
 
     public List<Schedule> viewWorkDays() throws SQLException {
         return scheduleDAO.getAllSchedules();
     }
 
-    public void addWorkDay(LocalDate workDate) throws SQLException {
-        Schedule schedule = new Schedule(0L, workDate, null);
-        scheduleDAO.addSchedule(schedule);
+    public long addWorkDay(LocalDate workDate) throws SQLException {
+        return scheduleDAO.addSchedule(new Schedule(workDate));
     }
 
     public List<TimeSlot> viewAvailableSlots() throws SQLException {
@@ -41,32 +42,48 @@ public class Admin extends User {
         return timeSlotDAO.getAvailableSlotsByScheduleId(scheduleId);
     }
 
-    public void addSlot(long scheduleId, OffsetDateTime start, OffsetDateTime end) throws SQLException {
-        TimeSlot slot = new TimeSlot(0L, scheduleId, start, end, true);
-        timeSlotDAO.addTimeSlot(slot);
+    public long addSlot(long scheduleId, OffsetDateTime start, OffsetDateTime end)
+            throws SQLException {
+        return timeSlotDAO.addTimeSlot(new TimeSlot(scheduleId, start, end, true));
     }
 
-    public void setSlotAvailability(long slotId, boolean available) throws SQLException {
-        timeSlotDAO.updateAvailability(slotId, available);
+    public boolean setSlotAvailability(long slotId, boolean available) throws SQLException {
+        return timeSlotDAO.updateAvailability(slotId, available) > 0;
     }
 
-    public void cancelAppointment(long appointmentId) throws SQLException {
-        appointmentDAO.updateStatus(appointmentId, "CANCELED");
-        System.out.println("Appointment " + appointmentId + " has been canceled.");
+    public boolean cancelAppointmentWithNote(long appointmentId, String note,
+                                             TimeSlotDAO tsDAO) throws SQLException {
+        Appointment a = appointmentDAO.getAppointmentById(appointmentId);
+        if (a == null) return false;
+        appointmentDAO.updateStatusAndNote(appointmentId, Appointment.STATUS_CANCELED, note);
+        if (a.getSlotId() != null) tsDAO.updateAvailability(a.getSlotId(), true);
+        return true;
     }
 
-    public void modifyAppointment(long appointmentId, int newCount) throws SQLException {
-        appointmentDAO.updateParticipants(appointmentId, newCount);
-        System.out.println("Appointment " + appointmentId + " participants updated to " + newCount);
+    public boolean modifyAppointmentWithNote(long appointmentId, int newCount, String note)
+            throws SQLException {
+        if (appointmentDAO.getAppointmentById(appointmentId) == null) return false;
+        appointmentDAO.updateParticipantsAndNote(appointmentId, newCount, note);
+        return true;
     }
 
-    public boolean validateDuration(Appointment appointment) {
-        long minutes = java.time.Duration.between(
-                appointment.getStartTime(), appointment.getEndTime()).toMinutes();
-        return minutes <= 30;
+    public boolean validateDuration(Appointment a) {
+        long min = java.time.Duration.between(a.getStartTime(), a.getEndTime()).toMinutes();
+        return min > 0 && min <= 60;
     }
 
-    public boolean validateCapacity(Appointment appointment) {
-        return appointment.getParticipantsCount() <= appointment.getMaxParticipants();
+    public boolean validateCapacity(Appointment a) {
+        return a.getParticipantsCount() >= 1 &&
+               a.getParticipantsCount() <= a.getMaxParticipants();
+    }
+
+    public boolean validateType(Appointment a) {
+        String t = a.getType();
+        return Appointment.TYPE_FIRST_VISIT.equalsIgnoreCase(t)
+            || Appointment.TYPE_FOLLOW_UP.equalsIgnoreCase(t)
+            || Appointment.TYPE_VIRTUAL.equalsIgnoreCase(t)
+            || Appointment.TYPE_GROUP_FIRST_VISIT.equalsIgnoreCase(t)
+            || Appointment.TYPE_GROUP_FOLLOW_UP.equalsIgnoreCase(t)
+            || Appointment.TYPE_GROUP_VIRTUAL.equalsIgnoreCase(t);
     }
 }
