@@ -4,6 +4,7 @@ import domain.Schedule;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,13 +68,16 @@ public class ScheduleDAO {
         return list;
     }
 
-    // Only today + future schedules
+    // Only today + future schedules.
+    // We pass today's date from Java (system timezone) to avoid UTC mismatch.
     public List<Schedule> getFutureSchedules() throws SQLException {
         List<Schedule> list = new ArrayList<>();
-        String sql = "SELECT * FROM schedules WHERE work_date >= CURRENT_DATE ORDER BY work_date ASC";
-        try (PreparedStatement s = connection.prepareStatement(sql);
-             ResultSet rs = s.executeQuery()) {
-            while (rs.next()) list.add(map(rs));
+        String sql = "SELECT * FROM schedules WHERE work_date >= ? ORDER BY work_date ASC";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setObject(1, LocalDate.now(ZoneId.systemDefault()));
+            try (ResultSet rs = s.executeQuery()) {
+                while (rs.next()) list.add(map(rs));
+            }
         }
         return list;
     }

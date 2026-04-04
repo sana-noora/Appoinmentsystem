@@ -117,8 +117,8 @@ public class AppointmentDAO {
     }
 
     /**
-     * Returns active (CONFIRMED) appointments for a specific work day,
-     * excluding DONE, CANCELED appointments.
+     * Returns active (CONFIRMED/PENDING) appointments for a specific work day.
+     * Excludes DONE and CANCELED appointments.
      *
      * @param date the work day date
      * @return list of active appointments on that day
@@ -140,7 +140,7 @@ public class AppointmentDAO {
     }
 
     /**
-     * Returns future active appointments for a specific work day (used by admin cancel/edit).
+     * Returns future active appointments for a specific work day.
      *
      * @param date the work day date
      * @return list of future CONFIRMED appointments on that day
@@ -171,6 +171,7 @@ public class AppointmentDAO {
      */
     public List<Appointment> getAppointmentsByUser(long userId) throws SQLException {
         List<Appointment> list = new ArrayList<>();
+        // FIX: use setInt since created_by is INTEGER in DB
         String sql = "SELECT * FROM appointments WHERE created_by=? ORDER BY start_time ASC";
         try (PreparedStatement s = connection.prepareStatement(sql)) {
             s.setInt(1, (int) userId);
@@ -200,11 +201,11 @@ public class AppointmentDAO {
     }
 
     /**
-     * Cancels an appointment (admin), stores the reason note, frees the slot,
-     * and marks canceled_by_admin = true so the user sees who canceled.
+     * Cancels an appointment by admin: sets status=CANCELED, stores note,
+     * sets canceled_by_admin=TRUE.
      *
-     * @param id     appointment ID
-     * @param note   admin reason (may be null)
+     * @param id   appointment ID
+     * @param note admin reason (may be null)
      * @return rows affected
      * @throws SQLException if a database error occurs
      */
@@ -243,38 +244,24 @@ public class AppointmentDAO {
     }
 
     /**
-     * Updates participant count.
+     * Updates participant count only (for visitor edits on Group appointments).
+     * FIX: also updates max_participants so the DB chk_cap constraint is not violated
+     * when participants_count exceeds the old max_participants value.
      *
      * @param id       appointment ID
-     * @param newCount new count
+     * @param newCount new participant count (1-5)
      * @return rows affected
      * @throws SQLException if a database error occurs
      */
     public int updateParticipants(long id, int newCount) throws SQLException {
-        String sql = "UPDATE appointments SET participants_count=?,updated_at=? WHERE id=?";
-        try (PreparedStatement s = connection.prepareStatement(sql)) {
-            s.setInt(1, newCount);
-            s.setObject(2, OffsetDateTime.now());
-            s.setLong(3, id);
-            return s.executeUpdate();
-        }
-    }
-
-    /**
-     * Updates participant count and sets an admin note.
-     *
-     * @param id       appointment ID
-     * @param newCount new count
-     * @param note     admin note
-     * @return rows affected
-     * @throws SQLException if a database error occurs
-     */
-    public int updateParticipantsAndNote(long id, int newCount, String note) throws SQLException {
+        // Update both participants_count AND max_participants so chk_cap is satisfied.
+        // max_participants for group is always MAX_GROUP (5).
         String sql = "UPDATE appointments " +
-                     "SET participants_count=?,admin_note=?,updated_at=? WHERE id=?";
+                     "SET participants_count=?, max_participants=GREATEST(max_participants,?), " +
+                     "    updated_at=? WHERE id=?";
         try (PreparedStatement s = connection.prepareStatement(sql)) {
             s.setInt(1, newCount);
-            s.setString(2, note);
+            s.setInt(2, newCount);   // ensures max_participants >= participants_count
             s.setObject(3, OffsetDateTime.now());
             s.setLong(4, id);
             return s.executeUpdate();
@@ -282,7 +269,32 @@ public class AppointmentDAO {
     }
 
     /**
+     * Updates participant count and sets an admin note.
+     * Also fixes max_participants to avoid chk_cap violation.
+     *
+     * @param id       appointment ID
+     * @param newCount new participant count
+     * @param note     admin note
+     * @return rows affected
+     * @throws SQLException if a database error occurs
+     */
+    public int updateParticipantsAndNote(long id, int newCount, String note) throws SQLException {
+        String sql = "UPDATE appointments " +
+                     "SET participants_count=?, max_participants=GREATEST(max_participants,?), " +
+                     "    admin_note=?, updated_at=? WHERE id=?";
+        try (PreparedStatement s = connection.prepareStatement(sql)) {
+            s.setInt(1, newCount);
+            s.setInt(2, newCount);
+            s.setString(3, note);
+            s.setObject(4, OffsetDateTime.now());
+            s.setLong(5, id);
+            return s.executeUpdate();
+        }
+    }
+
+    /**
      * Updates appointment type and optionally sets an admin note.
+     * When switching from Individual to Group, also sets max_participants=5.
      *
      * @param id      appointment ID
      * @param newType TYPE_* constant
@@ -291,19 +303,30 @@ public class AppointmentDAO {
      * @throws SQLException if a database error occurs
      */
     public int updateTypeAndNote(long id, String newType, String note) throws SQLException {
+        String normalized = normalizeType(newType);
+        boolean isGroup = normalized.startsWith("GROUP_");
         String sql = "UPDATE appointments " +
-                     "SET type=?::appointment_type,admin_note=?,updated_at=? WHERE id=?";
+                     "SET type=?::appointment_type, " +
+                     "    max_participants=?, " +
+                     "    participants_count=CASE WHEN participants_count > ? THEN ? ELSE participants_count END, " +
+                     "    admin_note=?, updated_at=? WHERE id=?";
         try (PreparedStatement s = connection.prepareStatement(sql)) {
-            s.setString(1, normalizeType(newType));
-            s.setString(2, note);
-            s.setObject(3, OffsetDateTime.now());
-            s.setLong(4, id);
+            int maxP = isGroup ? 5 : 1;
+            s.setString(1, normalized);
+            s.setInt(2, maxP);
+            s.setInt(3, maxP);
+            s.setInt(4, maxP);
+            s.setString(5, note);
+            s.setObject(6, OffsetDateTime.now());
+            s.setLong(7, id);
             return s.executeUpdate();
         }
     }
 
     /**
-     * Updates appointment type.
+     * Updates appointment type only (for visitor edits).
+     * When switching from Individual to Group, also sets max_participants=5.
+     * When switching from Group to Individual, resets participants_count=1, max_participants=1.
      *
      * @param id      appointment ID
      * @param newType TYPE_* constant
@@ -311,11 +334,21 @@ public class AppointmentDAO {
      * @throws SQLException if a database error occurs
      */
     public int updateType(long id, String newType) throws SQLException {
-        String sql = "UPDATE appointments SET type=?::appointment_type,updated_at=? WHERE id=?";
+        String normalized = normalizeType(newType);
+        boolean isGroup = normalized.startsWith("GROUP_");
+        int maxP = isGroup ? 5 : 1;
+        String sql = "UPDATE appointments " +
+                     "SET type=?::appointment_type, " +
+                     "    max_participants=?, " +
+                     "    participants_count=CASE WHEN participants_count > ? THEN ? ELSE participants_count END, " +
+                     "    updated_at=? WHERE id=?";
         try (PreparedStatement s = connection.prepareStatement(sql)) {
-            s.setString(1, normalizeType(newType));
-            s.setObject(2, OffsetDateTime.now());
-            s.setLong(3, id);
+            s.setString(1, normalized);
+            s.setInt(2, maxP);
+            s.setInt(3, maxP);
+            s.setInt(4, maxP);
+            s.setObject(5, OffsetDateTime.now());
+            s.setLong(6, id);
             return s.executeUpdate();
         }
     }

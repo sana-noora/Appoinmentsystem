@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import service.ReminderService;
 
 public class Main {
 
@@ -44,6 +45,9 @@ public class Main {
             UserDAO        userDAO = new UserDAO(conn);
 
             apptDAO.markPastAppointmentsDone();
+
+            // Sprint 3: send reminder emails for appointments within 24h
+            new ReminderService(apptDAO, userDAO).sendReminders();
 
             User user = loginLoop(userDAO);
             if (user == null) { System.out.println("Too many failed attempts. Exiting."); return; }
@@ -124,7 +128,7 @@ public class Main {
     private static void adminViewAppointments(AppointmentDAO apptDAO,
                                               ScheduleDAO schedDAO,
                                               UserDAO userDAO) throws SQLException {
-        List<Schedule> all = schedDAO.getAllSchedules();
+        List<Schedule> all = schedDAO.getFutureSchedules();
         if (all.isEmpty()) { System.out.println("  No work days in system.\n"); return; }
 
         System.out.println("\n  ── Work Days ─────────────────────────────────────────");
@@ -362,11 +366,14 @@ public class Main {
                 System.out.println("    " + fmtTime(s.getStartTime()));
         }
 
-        System.out.print("  New slot start hour (9-14): ");
-        int hour = readInt(9, 14); if (hour == -1) return;
+        System.out.print("  New slot start hour (0-23, whole hours only e.g. 9, 10, 14): ");
+        int hour = readInt(0, 23); if (hour == -1) return;
 
+        // Convert local hour (system timezone, e.g. Palestine UTC+3) to UTC for DB storage
         OffsetDateTime start = chosen.getWorkDate().atTime(hour, 0)
-                .atOffset(ZoneOffset.UTC);
+                .atZone(ZoneId.systemDefault())
+                .toOffsetDateTime()
+                .withOffsetSameInstant(ZoneOffset.UTC);
         OffsetDateTime end   = start.plusHours(1);
 
         if (slotDAO.existsByScheduleAndStart(chosen.getId(), start)) {
@@ -542,16 +549,32 @@ public class Main {
         List<Appointment> all = apptDAO.getAppointmentsByUser(uid);
         if (all.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
 
+        // Filter: hide appointments canceled by the user themselves
+        List<Appointment> visible = all.stream()
+                .filter(a -> !(Appointment.STATUS_CANCELED.equals(a.getStatus())
+                               && !a.isCanceledByAdmin()))
+                .collect(Collectors.toList());
+
+        if (visible.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
+
+        // Sort: 1) DONE first  2) CANCELED_BY_ADMIN second  3) Upcoming last
+        // Within each group, sort by start_time ascending
+        visible.sort((a, b) -> {
+            int groupA = sortGroup(a);
+            int groupB = sortGroup(b);
+            if (groupA != groupB) return Integer.compare(groupA, groupB);
+            return a.getStartTime().compareTo(b.getStartTime());
+        });
+
         System.out.println("\n  ── My Appointments ───────────────────────────────────────────");
-        for (Appointment a : all) {
+        for (Appointment a : visible) {
             long dur = Duration.between(a.getStartTime(), a.getEndTime()).toMinutes();
             String statusLabel;
             if (Appointment.STATUS_DONE.equals(a.getStatus())) {
                 statusLabel = "[DONE]";
             } else if (Appointment.STATUS_CANCELED.equals(a.getStatus())) {
-                statusLabel = a.isCanceledByAdmin() ? "[CANCELED by Admin]" : "[CANCELED]";
+                statusLabel = "[CANCELED by Admin]";
             } else {
-                // future
                 boolean near = isWithin24h(a.getStartTime());
                 statusLabel = near ? "[⚠ Less than 24h remaining]" : "[Upcoming]";
             }
@@ -569,6 +592,13 @@ public class Main {
                 System.out.println("       📝 Note from Admin: " + a.getAdminNote());
         }
         System.out.println();
+    }
+
+    // Sort group: 0 = DONE, 1 = CANCELED by admin, 2 = Upcoming
+    private static int sortGroup(Appointment a) {
+        if (Appointment.STATUS_DONE.equals(a.getStatus()))     return 0;
+        if (Appointment.STATUS_CANCELED.equals(a.getStatus())) return 1;
+        return 2;
     }
 
     // ── VISITOR 3: Edit ──────────────────────────────────────────────
