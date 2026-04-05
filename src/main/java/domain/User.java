@@ -2,7 +2,7 @@ package domain;
 
 public class User {
 
-    public enum Role { ADMIN, PATIENT }
+    public enum Role { ADMIN, VISITOR }
 
     private String id;
     private String name;

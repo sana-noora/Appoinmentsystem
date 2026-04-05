@@ -35,6 +35,7 @@ public class Main {
     //  MAIN
     // ================================================================
     public static void main(String[] args) {
+    	while (true) {
         printBanner();
         try (Connection conn = connectDB.getConnection()) {
             System.out.println("[OK] Connected to database.\n");
@@ -70,6 +71,7 @@ public class Main {
             System.err.println("[ERROR] " + e.getMessage());
             e.printStackTrace();
         }
+    	}
     }
 
     // ================================================================
@@ -395,7 +397,7 @@ public class Main {
         System.out.print("  Password   : "); String pw   = sc.nextLine().trim();
         System.out.print("  Role (1=Admin, 2=Visitor): ");
         String rc = sc.nextLine().trim();
-        User.Role role = "1".equals(rc) ? User.Role.ADMIN : User.Role.PATIENT;
+        User.Role role = "1".equals(rc) ? User.Role.ADMIN : User.Role.VISITOR;
 
         // id is auto-generated — pass empty string, DAO ignores it
         userDAO.addUser(new User("", name, mail, ph, un, role), pw);
@@ -800,4 +802,5 @@ public class Main {
         System.out.println("╚══════════════════════════════════════════════════════╝");
         System.out.println();
     }
+    
 }

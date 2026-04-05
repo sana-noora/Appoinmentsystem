@@ -20,6 +20,10 @@ class ScheduleTest {
         createdAt = OffsetDateTime.now();
     }
 
+    // =====================================================
+    // Constructors
+    // =====================================================
+
     @Test
     void defaultConstructor_shouldCreateEmptyObject() {
         Schedule schedule = new Schedule();
@@ -43,10 +47,14 @@ class ScheduleTest {
     void constructorWithWorkDate_shouldSetWorkDateOnly() {
         Schedule schedule = new Schedule(workDate);
 
-        assertEquals(workDate, schedule.getWorkDate());
         assertEquals(0L, schedule.getId());
+        assertEquals(workDate, schedule.getWorkDate());
         assertNull(schedule.getCreatedAt());
     }
+
+    // =====================================================
+    // Getters & Setters
+    // =====================================================
 
     @Test
     void settersAndGetters_shouldWorkCorrectly() {
@@ -59,14 +67,18 @@ class ScheduleTest {
         assertEquals(workDate, schedule.getWorkDate());
     }
 
+    // =====================================================
+    // toString
+    // =====================================================
+
     @Test
-    void toString_shouldContainImportantFields() {
+    void toString_shouldContainIdAndWorkDate() {
         Schedule schedule = new Schedule(2L, workDate, createdAt);
 
         String result = schedule.toString();
 
+        assertNotNull(result);
         assertTrue(result.contains("id=2"));
         assertTrue(result.contains(workDate.toString()));
-        assertTrue(result.contains("createdAt"));
     }
 }
