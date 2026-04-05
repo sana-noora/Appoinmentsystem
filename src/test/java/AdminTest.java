@@ -1,3 +1,5 @@
+
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -11,27 +13,21 @@ import persistence.ScheduleDAO;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.mockito.ArgumentMatchers.anyLong;
 
 @ExtendWith(MockitoExtension.class)
 class AdminTest {
 
-    @Mock
-    private AppointmentDAO appointmentDAO;
-
-    @Mock
-    private TimeSlotDAO timeSlotDAO;
-
-    @Mock
-    private ScheduleDAO scheduleDAO;
+    @Mock private AppointmentDAO appointmentDAO;
+    @Mock private TimeSlotDAO timeSlotDAO;
+    @Mock private ScheduleDAO scheduleDAO;
 
     private Admin admin;
 
@@ -49,22 +45,24 @@ class AdminTest {
         );
     }
 
+    // -------------------- Work days --------------------
+
     @Test
     void viewWorkDays_shouldReturnSchedules() throws Exception {
         when(scheduleDAO.getAllSchedules())
                 .thenReturn(Arrays.asList(new Schedule()));
 
         List<Schedule> result = admin.viewWorkDays();
-
         assertEquals(1, result.size());
     }
 
     @Test
     void addWorkDay_shouldCallDAO() throws Exception {
         admin.addWorkDay(LocalDate.now());
-
         verify(scheduleDAO).addSchedule(any(Schedule.class));
     }
+
+    // -------------------- Slots --------------------
 
     @Test
     void viewAvailableSlots_shouldReturnSlots() throws Exception {
@@ -72,95 +70,133 @@ class AdminTest {
                 .thenReturn(Arrays.asList(new TimeSlot()));
 
         List<TimeSlot> result = admin.viewAvailableSlots();
-
         assertEquals(1, result.size());
     }
 
     @Test
     void viewAvailableSlotsByDay_shouldReturnSlots() throws Exception {
-        when(timeSlotDAO.getAvailableSlotsByScheduleId(anyLong()))
+        when(timeSlotDAO.getAvailableSlotsByScheduleId(5L))
                 .thenReturn(Arrays.asList(new TimeSlot()));
 
         List<TimeSlot> result = admin.viewAvailableSlotsByDay(5L);
-
         assertEquals(1, result.size());
     }
 
     @Test
     void addSlot_shouldCallDAO() throws Exception {
-        admin.addSlot(
-                3L,
-                OffsetDateTime.now(),
-                OffsetDateTime.now().plusMinutes(30)
-        );
-
+        admin.addSlot(3L, OffsetDateTime.now(), OffsetDateTime.now().plusMinutes(30));
         verify(timeSlotDAO).addTimeSlot(any(TimeSlot.class));
     }
 
     @Test
-    void setSlotAvailability_shouldCallDAO() throws Exception {
-        admin.setSlotAvailability(1L, false);
-
-        verify(timeSlotDAO).updateAvailability(1L, false);
+    void setSlotAvailability_shouldReturnTrueWhenUpdated() throws Exception {
+        when(timeSlotDAO.updateAvailability(1L, false)).thenReturn(1);
+        assertTrue(admin.setSlotAvailability(1L, false));
     }
 
     @Test
-    void cancelAppointment_shouldUpdateStatus() throws Exception {
-        admin.cancelAppointment(10L);
+    void setSlotAvailability_shouldReturnFalseWhenNotUpdated() throws Exception {
+        when(timeSlotDAO.updateAvailability(1L, false)).thenReturn(0);
+        assertFalse(admin.setSlotAvailability(1L, false));
+    }
 
-        verify(appointmentDAO).updateStatus(10L, "CANCELED");
+    // -------------------- Cancel appointment --------------------
+
+    @Test
+    void cancelAppointmentWithNote_shouldCancelAndFreeSlot() throws Exception {
+        Appointment a = mock(Appointment.class);
+        when(a.getSlotId()).thenReturn(4L);
+        when(appointmentDAO.getAppointmentById(10L)).thenReturn(a);
+
+        boolean result = admin.cancelAppointmentWithNote(10L, "note", timeSlotDAO);
+
+        assertTrue(result);
+        verify(appointmentDAO)
+                .updateStatusAndNote(10L, Appointment.STATUS_CANCELED, "note");
+        verify(timeSlotDAO).updateAvailability(4L, true);
     }
 
     @Test
-    void modifyAppointment_shouldUpdateParticipants() throws Exception {
-        admin.modifyAppointment(7L, 4);
+    void cancelAppointmentWithNote_shouldReturnFalseWhenNotFound() throws Exception {
+        when(appointmentDAO.getAppointmentById(10L)).thenReturn(null);
+        assertFalse(admin.cancelAppointmentWithNote(10L, "note", timeSlotDAO));
+    }
 
-        verify(appointmentDAO).updateParticipants(7L, 4);
+    // -------------------- Modify appointment --------------------
+
+    @Test
+    void modifyAppointmentWithNote_shouldUpdateWhenExists() throws Exception {
+        Appointment a = mock(Appointment.class);
+        when(appointmentDAO.getAppointmentById(7L)).thenReturn(a);
+
+        boolean result = admin.modifyAppointmentWithNote(7L, 4, "note");
+
+        assertTrue(result);
+        verify(appointmentDAO).updateParticipantsAndNote(7L, 4, "note");
     }
 
     @Test
-    void validateDuration_shouldReturnTrueIfWithin30Minutes() {
-        Appointment appointment = mock(Appointment.class);
+    void modifyAppointmentWithNote_shouldReturnFalseWhenNotFound() throws Exception {
+        when(appointmentDAO.getAppointmentById(7L)).thenReturn(null);
+        assertFalse(admin.modifyAppointmentWithNote(7L, 4, "note"));
+    }
 
-        OffsetDateTime start = OffsetDateTime.now();
-        OffsetDateTime end = start.plusMinutes(30);
+    // -------------------- Validation --------------------
 
-        when(appointment.getStartTime()).thenReturn(start);
-        when(appointment.getEndTime()).thenReturn(end);
+    @Test
+    void validateDuration_shouldReturnTrueIfWithin60Minutes() {
+        Appointment a = mock(Appointment.class);
+        OffsetDateTime s = OffsetDateTime.now();
+        OffsetDateTime e = s.plusMinutes(30);
 
-        assertTrue(admin.validateDuration(appointment));
+        when(a.getStartTime()).thenReturn(s);
+        when(a.getEndTime()).thenReturn(e);
+
+        assertTrue(admin.validateDuration(a));
     }
 
     @Test
-    void validateDuration_shouldReturnFalseIfOver30Minutes() {
-        Appointment appointment = mock(Appointment.class);
+    void validateDuration_shouldReturnFalseIfOver60Minutes() {
+        Appointment a = mock(Appointment.class);
+        OffsetDateTime s = OffsetDateTime.now();
 
-        OffsetDateTime start = OffsetDateTime.now();
-        OffsetDateTime end = start.plusMinutes(45);
+        when(a.getStartTime()).thenReturn(s);
+        when(a.getEndTime()).thenReturn(s.plusMinutes(90));
 
-        when(appointment.getStartTime()).thenReturn(start);
-        when(appointment.getEndTime()).thenReturn(end);
-
-        assertFalse(admin.validateDuration(appointment));
+        assertFalse(admin.validateDuration(a));
     }
 
     @Test
     void validateCapacity_shouldReturnTrueIfWithinLimit() {
-        Appointment appointment = mock(Appointment.class);
+        Appointment a = mock(Appointment.class);
+        when(a.getParticipantsCount()).thenReturn(3);
+        when(a.getMaxParticipants()).thenReturn(5);
 
-        when(appointment.getParticipantsCount()).thenReturn(3);
-        when(appointment.getMaxParticipants()).thenReturn(5);
-
-        assertTrue(admin.validateCapacity(appointment));
+        assertTrue(admin.validateCapacity(a));
     }
 
     @Test
     void validateCapacity_shouldReturnFalseIfExceeded() {
-        Appointment appointment = mock(Appointment.class);
+        Appointment a = mock(Appointment.class);
+        when(a.getParticipantsCount()).thenReturn(6);
+        when(a.getMaxParticipants()).thenReturn(5);
 
-        when(appointment.getParticipantsCount()).thenReturn(6);
-        when(appointment.getMaxParticipants()).thenReturn(5);
+        assertFalse(admin.validateCapacity(a));
+    }
 
-        assertFalse(admin.validateCapacity(appointment));
+    @Test
+    void validateType_shouldReturnTrueForValidType() {
+        Appointment a = mock(Appointment.class);
+        when(a.getType()).thenReturn(Appointment.TYPE_VIRTUAL);
+
+        assertTrue(admin.validateType(a));
+    }
+
+    @Test
+    void validateType_shouldReturnFalseForInvalidType() {
+        Appointment a = mock(Appointment.class);
+        when(a.getType()).thenReturn("INVALID");
+
+        assertFalse(admin.validateType(a));
     }
 }

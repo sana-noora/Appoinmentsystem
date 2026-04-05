@@ -19,8 +19,12 @@ class TimeSlotTest {
         endTime = startTime.plusHours(1);
     }
 
+    // =====================================================
+    // Constructors
+    // =====================================================
+
     @Test
-    void defaultConstructor_shouldCreateEmptyObject() {
+    void defaultConstructor_shouldCreateObjectWithDefaultValues() {
         TimeSlot timeSlot = new TimeSlot();
 
         assertNotNull(timeSlot);
@@ -32,7 +36,7 @@ class TimeSlotTest {
     }
 
     @Test
-    void constructorWithId_shouldSetAllFields() {
+    void constructorWithId_shouldSetAllFieldsCorrectly() {
         TimeSlot timeSlot = new TimeSlot(
                 1L,
                 10L,
@@ -64,6 +68,10 @@ class TimeSlotTest {
         assertFalse(timeSlot.isAvailable());
     }
 
+    // =====================================================
+    // Getters & Setters
+    // =====================================================
+
     @Test
     void settersAndGetters_shouldWorkCorrectly() {
         TimeSlot timeSlot = new TimeSlot();
@@ -82,7 +90,23 @@ class TimeSlotTest {
     }
 
     @Test
-    void toString_shouldContainImportantFields() {
+    void setAvailable_shouldToggleAvailability() {
+        TimeSlot timeSlot = new TimeSlot();
+        assertFalse(timeSlot.isAvailable());
+
+        timeSlot.setAvailable(true);
+        assertTrue(timeSlot.isAvailable());
+
+        timeSlot.setAvailable(false);
+        assertFalse(timeSlot.isAvailable());
+    }
+
+    // =====================================================
+    // toString
+    // =====================================================
+
+    @Test
+    void toString_shouldContainIdTimesAndAvailability() {
         TimeSlot timeSlot = new TimeSlot(
                 3L,
                 8L,
@@ -93,8 +117,10 @@ class TimeSlotTest {
 
         String result = timeSlot.toString();
 
+        assertNotNull(result);
         assertTrue(result.contains("id=3"));
-        assertTrue(result.contains("scheduleId=8"));
+        assertTrue(result.contains(startTime.toString()));
+        assertTrue(result.contains(endTime.toString()));
         assertTrue(result.contains("available=true"));
     }
 }

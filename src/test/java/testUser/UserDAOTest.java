@@ -9,6 +9,7 @@ import persistence.UserDAO;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,10 @@ class UserDAOTest {
         userDAO = new UserDAO(connection);
     }
 
+    // =====================================================
+    // addUser
+    // =====================================================
+
     @Test
     void addUser_shouldExecuteInsert() throws Exception {
         when(connection.prepareStatement(anyString()))
@@ -48,48 +53,48 @@ class UserDAOTest {
                 "ali@test.com",
                 "123456",
                 "aliuser",
-                User.Role.PATIENT
+                User.Role.VISITOR
         );
 
         userDAO.addUser(user, "password123");
 
         verify(preparedStatement).executeUpdate();
+        verify(preparedStatement).setString(eq(6), eq("VISITOR"));
     }
 
+    // =====================================================
+    // login
+    // =====================================================
+
     @Test
-    void login_shouldReturnUserWhenCredentialsAreValid() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery())
-                .thenReturn(resultSet);
-        when(resultSet.next())
-                .thenReturn(true);
+    void login_shouldReturnUserWhenCredentialsValid() throws Exception {
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
 
         String rawPassword = "secret";
         String hash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
 
         when(resultSet.getString("password_hash")).thenReturn(hash);
-        when(resultSet.getString("id")).thenReturn("1");
+        when(resultSet.getInt("id")).thenReturn(1);
         when(resultSet.getString("name")).thenReturn("Ali");
         when(resultSet.getString("email")).thenReturn("ali@test.com");
         when(resultSet.getString("phone_number")).thenReturn("123456");
         when(resultSet.getString("username")).thenReturn("aliuser");
-        when(resultSet.getString("role")).thenReturn("PATIENT");
+        when(resultSet.getString("role")).thenReturn("VISITOR");
 
         Optional<User> result = userDAO.login("aliuser", rawPassword);
 
         assertTrue(result.isPresent());
         assertEquals("aliuser", result.get().getUsername());
+        assertTrue(result.get().isLoggedIn());
     }
 
     @Test
-    void login_shouldReturnEmptyWhenPasswordIsInvalid() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery())
-                .thenReturn(resultSet);
-        when(resultSet.next())
-                .thenReturn(true);
+    void login_shouldReturnEmptyWhenPasswordInvalid() throws Exception {
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
 
         String hash = BCrypt.hashpw("correct", BCrypt.gensalt());
         when(resultSet.getString("password_hash")).thenReturn(hash);
@@ -101,51 +106,78 @@ class UserDAOTest {
 
     @Test
     void login_shouldReturnEmptyWhenUserNotFound() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery())
-                .thenReturn(resultSet);
-        when(resultSet.next())
-                .thenReturn(false);
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
 
         Optional<User> result = userDAO.login("unknown", "pass");
 
         assertFalse(result.isPresent());
     }
 
-    @Test
-    void getUserById_shouldReturnUser() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery())
-                .thenReturn(resultSet);
-        when(resultSet.next())
-                .thenReturn(true);
+    // =====================================================
+    // getUserById
+    // =====================================================
 
-        when(resultSet.getString("id")).thenReturn("1");
+    @Test
+    void getUserById_shouldReturnUserWhenExists() throws Exception {
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true);
+
+        when(resultSet.getInt("id")).thenReturn(1);
         when(resultSet.getString("name")).thenReturn("Ali");
         when(resultSet.getString("email")).thenReturn("ali@test.com");
         when(resultSet.getString("phone_number")).thenReturn("123456");
         when(resultSet.getString("username")).thenReturn("aliuser");
-        when(resultSet.getString("role")).thenReturn("PATIENT");
+        when(resultSet.getString("role")).thenReturn("VISITOR");
 
         Optional<User> result = userDAO.getUserById("1");
 
         assertTrue(result.isPresent());
+        assertEquals("1", result.get().getId());
         assertEquals("Ali", result.get().getName());
     }
 
     @Test
     void getUserById_shouldReturnEmptyWhenNotFound() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(preparedStatement);
-        when(preparedStatement.executeQuery())
-                .thenReturn(resultSet);
-        when(resultSet.next())
-                .thenReturn(false);
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
 
         Optional<User> result = userDAO.getUserById("99");
 
         assertFalse(result.isPresent());
+    }
+
+    // =====================================================
+    // getAllUsers
+    // =====================================================
+
+    @Test
+    void getAllUsers_shouldReturnListOfUsers() throws Exception {
+        when(connection.prepareStatement(anyString())).thenReturn(preparedStatement);
+        when(preparedStatement.executeQuery()).thenReturn(resultSet);
+
+        when(resultSet.next()).thenReturn(true, true, false);
+
+        when(resultSet.getInt("id")).thenReturn(1, 2);
+        when(resultSet.getString("name")).thenReturn("Ali", "Noora");
+        when(resultSet.getString("email"))
+                .thenReturn("ali@test.com", "admin@test.com");
+        when(resultSet.getString("phone_number"))
+                .thenReturn("123", "456");
+        when(resultSet.getString("username"))
+                .thenReturn("aliuser", "adminuser");
+        when(resultSet.getString("role"))
+                .thenReturn("VISITOR", "ADMIN");
+
+        List<User> users = userDAO.getAllUsers();
+
+        assertEquals(2, users.size());
+        assertEquals("Ali", users.get(0).getName());
+        assertEquals(User.Role.VISITOR, users.get(0).getRole());
+        assertEquals("Noora", users.get(1).getName());
+        assertEquals(User.Role.ADMIN, users.get(1).getRole());
     }
 }
