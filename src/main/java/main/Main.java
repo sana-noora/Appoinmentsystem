@@ -21,7 +21,6 @@ public class Main {
     private static final String OWNER_EMAIL = "nooraqaradeh3@gmail.com";
     private static final int    MAX_GROUP   = 5;
 
-    // Display: "Thursday, 03 Apr 2026  09:00"
     private static final DateTimeFormatter DISPLAY_DT =
             DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy  HH:mm", Locale.ENGLISH);
     private static final DateTimeFormatter DISPLAY_DATE =
@@ -29,49 +28,49 @@ public class Main {
     private static final DateTimeFormatter INPUT_DATE =
             DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH);
 
-    private static final Scanner sc = new Scanner(System.in);
+   
+    public static Scanner sc = new Scanner(System.in);
 
     // ================================================================
     //  MAIN
     // ================================================================
     public static void main(String[] args) {
-    	while (true) {
-        printBanner();
-        try (Connection conn = connectDB.getConnection()) {
-            System.out.println("[OK] Connected to database.\n");
+        while (true) {
+            printBanner();
+            try (Connection conn = connectDB.getConnection()) {
+                System.out.println("[OK] Connected to database.\n");
 
-            AppointmentDAO apptDAO = new AppointmentDAO(conn);
-            TimeSlotDAO    slotDAO = new TimeSlotDAO(conn);
-            ScheduleDAO    schedDAO = new ScheduleDAO(conn);
-            UserDAO        userDAO = new UserDAO(conn);
+                AppointmentDAO apptDAO = new AppointmentDAO(conn);
+                TimeSlotDAO    slotDAO = new TimeSlotDAO(conn);
+                ScheduleDAO    schedDAO = new ScheduleDAO(conn);
+                UserDAO        userDAO = new UserDAO(conn);
 
-            apptDAO.markPastAppointmentsDone();
+                apptDAO.markPastAppointmentsDone();
 
-            // Sprint 3: send reminder emails for appointments within 24h
-            new ReminderService(apptDAO, userDAO).sendReminders();
+                new ReminderService(apptDAO, userDAO).sendReminders();
 
-            User user = loginLoop(userDAO);
-            if (user == null) { System.out.println("Too many failed attempts. Exiting."); return; }
+                User user = loginLoop(userDAO);
+                if (user == null) { System.out.println("Too many failed attempts. Exiting."); return; }
 
-            System.out.println("\nWelcome, " + user.getName() + "  [" +
-                    (user.getRole() == User.Role.ADMIN ? "Admin" : "Visitor") + "]\n");
+                System.out.println("\nWelcome, " + user.getName() + "  [" +
+                        (user.getRole() == User.Role.ADMIN ? "Admin" : "Visitor") + "]\n");
 
-            if (user.getRole() == User.Role.ADMIN) {
-                Admin admin = new Admin(user.getId(), user.getName(), user.getEmail(),
-                        user.getPhoneNumber(), user.getUsername(),
-                        apptDAO, slotDAO, schedDAO);
-                admin.markLoggedIn();
-                adminMenu(admin, apptDAO, slotDAO, schedDAO, userDAO);
-            } else {
-                user.markLoggedIn();
-                visitorMenu(user, apptDAO, slotDAO, schedDAO, userDAO);
+                if (user.getRole() == User.Role.ADMIN) {
+                    Admin admin = new Admin(user.getId(), user.getName(), user.getEmail(),
+                            user.getPhoneNumber(), user.getUsername(),
+                            apptDAO, slotDAO, schedDAO);
+                    admin.markLoggedIn();
+                    adminMenu(admin, apptDAO, slotDAO, schedDAO, userDAO);
+                } else {
+                    user.markLoggedIn();
+                    visitorMenu(user, apptDAO, slotDAO, schedDAO, userDAO);
+                }
+
+            } catch (SQLException e) {
+                System.err.println("[ERROR] " + e.getMessage());
+                e.printStackTrace();
             }
-
-        } catch (SQLException e) {
-            System.err.println("[ERROR] " + e.getMessage());
-            e.printStackTrace();
         }
-    	}
     }
 
     // ================================================================
@@ -126,7 +125,7 @@ public class Main {
         }
     }
 
-    // ── ADMIN 1: View appointments (active only, pick day) ──────────
+    // ── ADMIN 1: View appointments ───────────────────────────────────
     private static void adminViewAppointments(AppointmentDAO apptDAO,
                                               ScheduleDAO schedDAO,
                                               UserDAO userDAO) throws SQLException {
@@ -164,7 +163,7 @@ public class Main {
         System.out.println();
     }
 
-    // ── ADMIN 2: Cancel appointment ─────────────────────────────────
+    // ── ADMIN 2: Cancel appointment ──────────────────────────────────
     private static void adminCancelAppointment(AppointmentDAO apptDAO,
                                                TimeSlotDAO slotDAO,
                                                ScheduleDAO schedDAO,
@@ -371,7 +370,6 @@ public class Main {
         System.out.print("  New slot start hour (0-23, whole hours only e.g. 9, 10, 14): ");
         int hour = readInt(0, 23); if (hour == -1) return;
 
-        // Convert local hour (system timezone, e.g. Palestine UTC+3) to UTC for DB storage
         OffsetDateTime start = chosen.getWorkDate().atTime(hour, 0)
                 .atZone(ZoneId.systemDefault())
                 .toOffsetDateTime()
@@ -399,7 +397,6 @@ public class Main {
         String rc = sc.nextLine().trim();
         User.Role role = "1".equals(rc) ? User.Role.ADMIN : User.Role.VISITOR;
 
-        // id is auto-generated — pass empty string, DAO ignores it
         userDAO.addUser(new User("", name, mail, ph, un, role), pw);
         System.out.println("  ✓ User registered successfully.\n");
     }
@@ -475,7 +472,6 @@ public class Main {
         int si = readInt(1, avail.size()); if (si == -1) return;
         TimeSlot slot = avail.get(si - 1);
 
-        // Duration
         System.out.print("  Duration in minutes (max 60): ");
         int dur = readInt(1, 60);
         if (dur == -1) {
@@ -485,7 +481,6 @@ public class Main {
         OffsetDateTime start = slot.getStartTime();
         OffsetDateTime end   = start.plusMinutes(dur);
 
-        // Category
         System.out.println("  Appointment type: 1=Individual  2=Group");
         System.out.print("  Choice: ");
         String cat = sc.nextLine().trim();
@@ -551,7 +546,6 @@ public class Main {
         List<Appointment> all = apptDAO.getAppointmentsByUser(uid);
         if (all.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
 
-        // Filter: hide appointments canceled by the user themselves
         List<Appointment> visible = all.stream()
                 .filter(a -> !(Appointment.STATUS_CANCELED.equals(a.getStatus())
                                && !a.isCanceledByAdmin()))
@@ -559,8 +553,6 @@ public class Main {
 
         if (visible.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
 
-        // Sort: 1) DONE first  2) CANCELED_BY_ADMIN second  3) Upcoming last
-        // Within each group, sort by start_time ascending
         visible.sort((a, b) -> {
             int groupA = sortGroup(a);
             int groupB = sortGroup(b);
@@ -596,7 +588,6 @@ public class Main {
         System.out.println();
     }
 
-    // Sort group: 0 = DONE, 1 = CANCELED by admin, 2 = Upcoming
     private static int sortGroup(Appointment a) {
         if (Appointment.STATUS_DONE.equals(a.getStatus()))     return 0;
         if (Appointment.STATUS_CANCELED.equals(a.getStatus())) return 1;
@@ -778,7 +769,6 @@ public class Main {
         System.out.println();
     }
 
-    // Reads an int in [min, max]; returns -1 on invalid
     private static int readInt(int min, int max) {
         try {
             int v = Integer.parseInt(sc.nextLine().trim());
@@ -788,7 +778,6 @@ public class Main {
         return -1;
     }
 
-    // Reads a long; returns -1 on invalid
     private static long readLong() {
         try { return Long.parseLong(sc.nextLine().trim()); }
         catch (NumberFormatException e) {
@@ -802,5 +791,4 @@ public class Main {
         System.out.println("╚══════════════════════════════════════════════════════╝");
         System.out.println();
     }
-    
 }
