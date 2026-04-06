@@ -202,13 +202,18 @@ class ScheduleDAOTest {
                 .thenReturn(resultSet);
 
         when(resultSet.next()).thenReturn(true, false);
-        mockScheduleRow(5L);
+
+        when(resultSet.getLong("id")).thenReturn(5L);
+        when(resultSet.getObject("work_date", LocalDate.class))
+                .thenReturn(LocalDate.now().plusDays(5));
+        when(resultSet.getObject("created_at", OffsetDateTime.class))
+                .thenReturn(OffsetDateTime.now());
 
         List<Schedule> schedules = scheduleDAO.getFutureSchedules();
 
         assertEquals(1, schedules.size());
-        assertTrue(
-                !schedules.get(0).getWorkDate()
+        assertFalse(
+                schedules.get(0).getWorkDate()
                         .isBefore(LocalDate.now(ZoneId.systemDefault()))
         );
     }
