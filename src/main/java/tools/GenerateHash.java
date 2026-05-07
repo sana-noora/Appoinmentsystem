@@ -15,9 +15,9 @@ public class GenerateHash {
             );
         }
 
-        String hashedPassword =
+        String hashePassword =
                 BCrypt.hashpw(plainPassword, BCrypt.gensalt());
 
-        System.out.println("Hashed: " + hashedPassword);
+        System.out.println("Hashed: " + hashePassword);
     }
 }
