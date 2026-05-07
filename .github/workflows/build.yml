@@ -38,6 +38,7 @@ jobs:
             -Dsonar.projectKey=sana-noora_Appoinmentsystem
             -Dsonar.organization=sana-noora
             -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.java.binaries=target/classes
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
