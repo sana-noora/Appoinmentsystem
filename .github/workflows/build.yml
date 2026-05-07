@@ -31,6 +31,9 @@ jobs:
       - name: Build, Test & Coverage
         run: mvn -B verify --file pom.xml
 
+      - name: Copy Dependencies for Sonar
+        run: mvn dependency:copy-dependencies -DoutputDirectory=target/dependency
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         with:
@@ -39,6 +42,7 @@ jobs:
             -Dsonar.organization=sana-noora
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.java.binaries=target/classes
+            -Dsonar.java.libraries=target/dependency/*.jar
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
