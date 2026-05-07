@@ -11,7 +11,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
@@ -19,12 +19,12 @@
     <sonar.projectKey>sana-noora_Appoinmentsystem</sonar.projectKey>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
-    <sonar.exclusions>src/test/java/**,doc/**</sonar.exclusions>
+    <sonar.exclusions>doc/**</sonar.exclusions>
     <sonar.coverage.exclusions>src/test/java/**,doc/**</sonar.coverage.exclusions>
     <sonar.coverage.jacoco.xmlReportPaths>
         target/site/jacoco/jacoco.xml
     </sonar.coverage.jacoco.xmlReportPaths>
-    </properties>
+</properties>
  
 
     <dependencies>
