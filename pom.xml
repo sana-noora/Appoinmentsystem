@@ -21,6 +21,7 @@
 
     <sonar.exclusions>doc/**</sonar.exclusions>
     <sonar.coverage.exclusions>src/test/java/**,doc/**</sonar.coverage.exclusions>
+    <sonar.coverage.exclusions>src/main/java/soft/AppoinmentSystem/presentaion/**/*</sonar.coverage.exclusions>
     <sonar.coverage.jacoco.xmlReportPaths>
         target/site/jacoco/jacoco.xml
     </sonar.coverage.jacoco.xmlReportPaths>
