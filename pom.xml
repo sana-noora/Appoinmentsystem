@@ -20,7 +20,7 @@
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
     <sonar.exclusions>doc/**</sonar.exclusions>
-    <sonar.coverage.exclusions>src/test/java/**,doc/**</sonar.coverage.exclusions>
+    <sonar.coverage.exclusions>src/test/java/**,doc/**, src/main/java/tools/GenerateHash.java</sonar.coverage.exclusions>
     <sonar.coverage.exclusions>src/main/java/soft/AppoinmentSystem/presentaion/**/*</sonar.coverage.exclusions>
     <sonar.coverage.jacoco.xmlReportPaths>
         target/site/jacoco/jacoco.xml
