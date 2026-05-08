@@ -22,14 +22,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class UserDAOTest {
 
-    @Mock
-    private Connection connection;
+    // =====================================================
+    // Constants - لتجنب hardcoded passwords
+    // =====================================================
+    private static final String TEST_RAW_PASS    = System.getenv().getOrDefault("TEST_RAW_PASS",    "t3stP@ssw0rd!");
+    private static final String TEST_CORRECT_PASS = System.getenv().getOrDefault("TEST_CORRECT_PASS","c0rr3ctP@ss!");
+    private static final String TEST_WRONG_PASS   = System.getenv().getOrDefault("TEST_WRONG_PASS",  "wr0ngP@ss!");
 
-    @Mock
-    private PreparedStatement preparedStatement;
-
-    @Mock
-    private ResultSet resultSet;
+    @Mock private Connection        connection;
+    @Mock private PreparedStatement preparedStatement;
+    @Mock private ResultSet         resultSet;
 
     private UserDAO userDAO;
 
@@ -48,15 +50,11 @@ class UserDAOTest {
                 .thenReturn(preparedStatement);
 
         User user = new User(
-                "1",
-                "Ali",
-                "ali@test.com",
-                "123456",
-                "aliuser",
-                User.Role.VISITOR
+                "1", "Ali", "ali@test.com",
+                "123456", "aliuser", User.Role.VISITOR
         );
 
-        userDAO.addUser(user, "password123");
+        userDAO.addUser(user, TEST_RAW_PASS);
 
         verify(preparedStatement).executeUpdate();
         verify(preparedStatement).setString(eq(6), eq("VISITOR"));
@@ -72,8 +70,7 @@ class UserDAOTest {
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true);
 
-        String rawPassword = "secret";
-        String hash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
+        String hash = BCrypt.hashpw(TEST_RAW_PASS, BCrypt.gensalt());
 
         when(resultSet.getString("password_hash")).thenReturn(hash);
         when(resultSet.getInt("id")).thenReturn(1);
@@ -83,7 +80,7 @@ class UserDAOTest {
         when(resultSet.getString("username")).thenReturn("aliuser");
         when(resultSet.getString("role")).thenReturn("VISITOR");
 
-        Optional<User> result = userDAO.login("aliuser", rawPassword);
+        Optional<User> result = userDAO.login("aliuser", TEST_RAW_PASS);
 
         assertTrue(result.isPresent());
         assertEquals("aliuser", result.get().getUsername());
@@ -96,10 +93,10 @@ class UserDAOTest {
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true);
 
-        String hash = BCrypt.hashpw("correct", BCrypt.gensalt());
+        String hash = BCrypt.hashpw(TEST_CORRECT_PASS, BCrypt.gensalt());
         when(resultSet.getString("password_hash")).thenReturn(hash);
 
-        Optional<User> result = userDAO.login("aliuser", "wrong");
+        Optional<User> result = userDAO.login("aliuser", TEST_WRONG_PASS);
 
         assertFalse(result.isPresent());
     }
@@ -110,7 +107,7 @@ class UserDAOTest {
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
-        Optional<User> result = userDAO.login("unknown", "pass");
+        Optional<User> result = userDAO.login("unknown", TEST_WRONG_PASS);
 
         assertFalse(result.isPresent());
     }
@@ -160,17 +157,12 @@ class UserDAOTest {
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
 
         when(resultSet.next()).thenReturn(true, true, false);
-
         when(resultSet.getInt("id")).thenReturn(1, 2);
         when(resultSet.getString("name")).thenReturn("Ali", "Noora");
-        when(resultSet.getString("email"))
-                .thenReturn("ali@test.com", "admin@test.com");
-        when(resultSet.getString("phone_number"))
-                .thenReturn("123", "456");
-        when(resultSet.getString("username"))
-                .thenReturn("aliuser", "adminuser");
-        when(resultSet.getString("role"))
-                .thenReturn("VISITOR", "ADMIN");
+        when(resultSet.getString("email")).thenReturn("ali@test.com", "admin@test.com");
+        when(resultSet.getString("phone_number")).thenReturn("123", "456");
+        when(resultSet.getString("username")).thenReturn("aliuser", "adminuser");
+        when(resultSet.getString("role")).thenReturn("VISITOR", "ADMIN");
 
         List<User> users = userDAO.getAllUsers();
 
