@@ -1,28 +1,30 @@
 name: Build and Analyze
+
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   build:
     name: Build and SonarCloud Scan
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
         with:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@5e0d6d4ef2b4e9d47f062cdd7e17f9a7616f37be
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Cache Maven packages
-        uses: actions/cache@v3
+        uses: actions/cache@0c45773b623bea8c8c33c14c3770f8ddb4fe5bc9
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -35,7 +37,7 @@ jobs:
         run: mvn dependency:copy-dependencies -DoutputDirectory=target/dependency
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        uses: SonarSource/sonarqube-scan-action@8bfdb9b1443a0e7a68a8c113d2ef8404498c9a37
         with:
           args: >
             -Dsonar.projectKey=sana-noora_Appoinmentsystem
