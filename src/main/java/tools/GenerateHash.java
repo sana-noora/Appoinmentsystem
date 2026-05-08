@@ -6,7 +6,6 @@ public class GenerateHash {
 
     public static void main(String[] args) {
 
-        // Read the password from environment variable instead of hardcoding it
         String plainPassword = System.getenv("PLAIN_PASSWORD");
 
         if (plainPassword == null || plainPassword.isEmpty()) {
@@ -15,9 +14,8 @@ public class GenerateHash {
             );
         }
 
-        String hashePassword =
-                BCrypt.hashpw(plainPassword, BCrypt.gensalt());
+        String hashedPassword = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
 
-        System.out.println("Hashed: " + hashePassword);
+        System.out.println("Hashed: " + hashedPassword);
     }
 }
