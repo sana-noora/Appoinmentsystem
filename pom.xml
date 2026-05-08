@@ -21,12 +21,12 @@
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
         <!-- ❗️THE IMPORTANT FIX -->
-        <sonar.coverage.exclusions>
-            src/test/java/**,
-            doc/**,
-            src/main/java/tools/GenerateHash.java,
-            src/main/java/soft/AppoinmentSystem/presentaion/**
-        </sonar.coverage.exclusions>
+        <sonar.coverage.exclusions>     
+ **/src/test/java/**,
+    **/doc/**,
+    **/GenerateHash.java,
+    **/presentaion/**
+     </sonar.coverage.exclusions>
 
         <sonar.coverage.jacoco.xmlReportPaths>
             target/site/jacoco/jacoco.xml
@@ -64,7 +64,7 @@
         </dependency>
 
         <!-- JUnit -->
-        <dependency>
+       <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.7.2</version>
