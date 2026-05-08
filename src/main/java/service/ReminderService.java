@@ -57,7 +57,7 @@ public class ReminderService {
                     if (!optUser.isPresent()) continue;
 
                     User u = optUser.get();
-                    if (u.getEmail() == null || u.getEmail().isBlank()) continue;
+                    if (u.getEmail() == null || u.getEmail().trim().isEmpty()) continue;
 
                     sendEmail(u, a);
                     sent++;
