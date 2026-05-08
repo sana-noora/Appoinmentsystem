@@ -1,4 +1,4 @@
-package testAppointment;
+package appointment;
 
 import static org.junit.jupiter.api.Assertions.*;
 

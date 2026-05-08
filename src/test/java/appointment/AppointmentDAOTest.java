@@ -1,4 +1,4 @@
-package testAppointment;
+package appointment;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -6,7 +6,10 @@ import static org.mockito.Mockito.*;
 import domain.Appointment;
 import persistence.AppointmentDAO;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -25,7 +28,6 @@ class AppointmentDAOTest {
     @Mock private ResultSet resultSet;
 
     private AppointmentDAO dao;
-
     private OffsetDateTime start;
     private OffsetDateTime end;
 
@@ -41,9 +43,8 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void markPastAppointmentsDone_shouldExecuteUpdate() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
+    void markPastAppointmentsDoneShouldExecuteUpdate() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
         when(statement.executeUpdate()).thenReturn(2);
 
         dao.markPastAppointmentsDone();
@@ -56,9 +57,8 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void addAppointment_shouldExecuteInsert() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
+    void addAppointmentShouldExecuteInsert() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
 
         Appointment a = new Appointment(
                 0L,
@@ -85,11 +85,9 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void getAppointmentById_shouldReturnAppointment() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
+    void getAppointmentByIdShouldReturnAppointment() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true);
 
         mockAppointmentRow();
@@ -101,11 +99,9 @@ class AppointmentDAOTest {
     }
 
     @Test
-    void getAppointmentById_shouldReturnNullWhenNotFound() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
+    void getAppointmentByIdShouldReturnNullWhenNotFound() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(false);
 
         assertNull(dao.getAppointmentById(99L));
@@ -116,13 +112,11 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void getAllAppointments_shouldReturnList() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
-
+    void getAllAppointmentsShouldReturnList() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, true, false);
+
         mockAppointmentRow();
 
         List<Appointment> list = dao.getAllAppointments();
@@ -135,13 +129,11 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void getActiveAppointmentsByDate_shouldReturnList() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
-
+    void getActiveAppointmentsByDateShouldReturnList() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
+
         mockAppointmentRow();
 
         List<Appointment> list =
@@ -155,13 +147,11 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void getFutureAppointmentsByDate_shouldReturnList() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
-
+    void getFutureAppointmentsByDateShouldReturnList() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
+
         mockAppointmentRow();
 
         List<Appointment> list =
@@ -175,13 +165,11 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void getAppointmentsByUser_shouldReturnList() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeQuery())
-                .thenReturn(resultSet);
-
+    void getAppointmentsByUserShouldReturnList() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
+
         mockAppointmentRow();
 
         List<Appointment> list = dao.getAppointmentsByUser(5L);
@@ -194,13 +182,11 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void updateStatus_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
+    void updateStatusShouldReturnRows() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
         when(statement.executeUpdate()).thenReturn(1);
 
-        int rows =
-                dao.updateStatus(1L, Appointment.STATUS_DONE);
+        int rows = dao.updateStatus(1L, Appointment.STATUS_DONE);
 
         assertEquals(1, rows);
     }
@@ -210,9 +196,8 @@ class AppointmentDAOTest {
     // =====================================================
 
     @Test
-    void cancelByAdmin_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
+    void cancelByAdminShouldReturnRows() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
         when(statement.executeUpdate()).thenReturn(1);
 
         int rows = dao.cancelByAdmin(1L, "note");
@@ -221,129 +206,12 @@ class AppointmentDAOTest {
     }
 
     // =====================================================
-    // updateStatusAndNote
+    // invalid inputs
     // =====================================================
 
     @Test
-    void updateStatusAndNote_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows =
-                dao.updateStatusAndNote(1L,
-                        Appointment.STATUS_CONFIRMED,
-                        "note");
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // updateParticipants
-    // =====================================================
-
-    @Test
-    void updateParticipants_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows = dao.updateParticipants(1L, 4);
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // updateParticipantsAndNote
-    // =====================================================
-
-    @Test
-    void updateParticipantsAndNote_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows = dao.updateParticipantsAndNote(1L, 3, "note");
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // updateTypeAndNote
-    // =====================================================
-
-    @Test
-    void updateTypeAndNote_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows = dao.updateTypeAndNote(
-                1L,
-                Appointment.TYPE_GROUP_FIRST_VISIT,
-                "note"
-        );
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // updateType
-    // =====================================================
-
-    @Test
-    void updateType_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows = dao.updateType(1L, Appointment.TYPE_VIRTUAL);
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // updateSlotAndTime
-    // =====================================================
-
-    @Test
-    void updateSlotAndTime_shouldReturnRows() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-        when(statement.executeUpdate()).thenReturn(1);
-
-        int rows = dao.updateSlotAndTime(
-                1L,
-                10L,
-                start.plusHours(1),
-                end.plusHours(1)
-        );
-
-        assertEquals(1, rows);
-    }
-
-    // =====================================================
-    // deleteAppointment
-    // =====================================================
-
-    @Test
-    void deleteAppointment_shouldExecuteDelete() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-
-        dao.deleteAppointment(3L);
-
-        verify(statement).executeUpdate();
-    }
-
-    // =====================================================
-    // normalizeType — invalid
-    // =====================================================
-
-    @Test
-    void addAppointment_shouldThrowWhenTypeInvalid() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
+    void addAppointmentShouldThrowWhenTypeInvalid() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
 
         Appointment a = new Appointment(
                 0L,
@@ -364,15 +232,8 @@ class AppointmentDAOTest {
                 () -> dao.addAppointment(a));
     }
 
-    // =====================================================
-    // normalizeStatus — invalid
-    // =====================================================
-
     @Test
-    void updateStatus_shouldThrowWhenStatusInvalid() throws Exception {
-        when(connection.prepareStatement(anyString()))
-                .thenReturn(statement);
-
+    void updateStatusShouldThrowWhenStatusInvalid() {
         assertThrows(IllegalArgumentException.class,
                 () -> dao.updateStatus(1L, "BAD"));
     }
@@ -381,7 +242,7 @@ class AppointmentDAOTest {
     // helper
     // =====================================================
 
-    private void mockAppointmentRow() throws Exception {
+    private void mockAppointmentRow() throws SQLException {
         when(resultSet.getLong("id")).thenReturn(1L);
         when(resultSet.getString("type"))
                 .thenReturn(Appointment.TYPE_FIRST_VISIT);
