@@ -108,15 +108,15 @@ public class Main {
             System.out.print("Choice: ");
 
             switch (sc.nextLine().trim()) {
-                case "1": adminViewAppointments(apptDAO, schedDAO, userDAO);          break;
-                case "2": adminCancelAppointment(apptDAO, slotDAO, schedDAO, userDAO);break;
-                case "3": adminEditAppointment(apptDAO, schedDAO, userDAO);           break;
-                case "4": adminAddWorkDay(schedDAO);                                  break;
-                case "5": adminViewDaySlots(slotDAO, schedDAO);                       break;
-                case "6": adminAddSlot(slotDAO, schedDAO);                            break;
-                case "7": adminAddUser(userDAO);                                      break;
-                case "8": adminViewAllUsers(userDAO);                                 break;
-                case "9": admin.logout(); System.out.println("Logged out.\n");        break;
+                case "1": adminViewAppointments(apptDAO, schedDAO, userDAO);           break;
+                case "2": adminCancelAppointment(apptDAO, slotDAO, schedDAO, userDAO); break;
+                case "3": adminEditAppointment(apptDAO, schedDAO, userDAO);            break;
+                case "4": adminAddWorkDay(schedDAO);                                   break;
+                case "5": adminViewDaySlots(slotDAO, schedDAO);                        break;
+                case "6": adminAddSlot(slotDAO, schedDAO);                             break;
+                case "7": adminAddUser(userDAO);                                       break;
+                case "8": adminViewAllUsers(userDAO);                                  break;
+                case "9": admin.logout(); System.out.println("Logged out.\n");         break;
                 default:  System.out.println("  Invalid option.\n");
             }
         }
@@ -163,9 +163,7 @@ public class Main {
         if (chosen == null) return;
 
         List<Appointment> appts = apptDAO.getFutureAppointmentsByDate(chosen.getWorkDate());
-        if (appts.isEmpty()) {
-            System.out.println("  No future appointments on that day.\n"); return;
-        }
+        if (appts.isEmpty()) { System.out.println("  No future appointments on that day.\n"); return; }
 
         Appointment appt = pickAdminAppt(appts, apptDAO, userDAO, "Appointment ID to cancel: ");
         if (appt == null) return;
@@ -191,9 +189,7 @@ public class Main {
         if (chosen == null) return;
 
         List<Appointment> appts = apptDAO.getFutureAppointmentsByDate(chosen.getWorkDate());
-        if (appts.isEmpty()) {
-            System.out.println("  No future appointments on that day.\n"); return;
-        }
+        if (appts.isEmpty()) { System.out.println("  No future appointments on that day.\n"); return; }
 
         Appointment appt = pickAdminAppt(appts, apptDAO, userDAO, "Appointment ID to edit: ");
         if (appt == null) return;
@@ -208,27 +204,8 @@ public class Main {
         int    newCount = -1;
 
         if ("1".equals(ch)) {
-            System.out.println("  New category: 1=Individual  2=Group");
-            System.out.print("  Choice: ");
-            String cat = sc.nextLine().trim();
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            String vt = sc.nextLine().trim();
-            if ("1".equals(cat)) {
-                switch (vt) {
-                    case "1": newType = Appointment.TYPE_FIRST_VISIT; break;
-                    case "2": newType = Appointment.TYPE_FOLLOW_UP;   break;
-                    case "3": newType = Appointment.TYPE_VIRTUAL;     break;
-                    default: System.out.println("  Invalid.\n"); return;
-                }
-            } else if ("2".equals(cat)) {
-                switch (vt) {
-                    case "1": newType = Appointment.TYPE_GROUP_FIRST_VISIT; break;
-                    case "2": newType = Appointment.TYPE_GROUP_FOLLOW_UP;   break;
-                    case "3": newType = Appointment.TYPE_GROUP_VIRTUAL;     break;
-                    default: System.out.println("  Invalid.\n"); return;
-                }
-            } else { System.out.println("  Invalid.\n"); return; }
+            newType = askAppointmentType("  New category: 1=Individual  2=Group");
+            if (newType == null) return;
 
         } else if ("2".equals(ch)) {
             if (!appt.isGroup()) {
@@ -347,7 +324,6 @@ public class Main {
         System.out.print("  Role (1=Admin, 2=Visitor): ");
         String rc = sc.nextLine().trim();
         User.Role role = "1".equals(rc) ? User.Role.ADMIN : User.Role.VISITOR;
-
         userDAO.addUser(new User("", name, mail, ph, un, role), pw);
         System.out.println("  ✓ User registered successfully.\n");
     }
@@ -432,12 +408,8 @@ public class Main {
         if ("1".equals(cat)) {
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
             System.out.print("  Choice: ");
-            switch (sc.nextLine().trim()) {
-                case "1": apptType = Appointment.TYPE_FIRST_VISIT; break;
-                case "2": apptType = Appointment.TYPE_FOLLOW_UP;   break;
-                case "3": apptType = Appointment.TYPE_VIRTUAL;     break;
-                default:  System.out.println("  Invalid type.\n"); return;
-            }
+            apptType = resolveVisitType("1", sc.nextLine().trim());
+            if (apptType == null) { System.out.println("  Invalid type.\n"); return; }
             participants = 1; maxP = 1;
 
         } else if ("2".equals(cat)) {
@@ -448,12 +420,8 @@ public class Main {
             }
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
             System.out.print("  Choice: ");
-            switch (sc.nextLine().trim()) {
-                case "1": apptType = Appointment.TYPE_GROUP_FIRST_VISIT; break;
-                case "2": apptType = Appointment.TYPE_GROUP_FOLLOW_UP;   break;
-                case "3": apptType = Appointment.TYPE_GROUP_VIRTUAL;     break;
-                default:  System.out.println("  Invalid type.\n"); return;
-            }
+            apptType = resolveVisitType("2", sc.nextLine().trim());
+            if (apptType == null) { System.out.println("  Invalid type.\n"); return; }
             maxP = MAX_GROUP;
 
         } else {
@@ -552,28 +520,8 @@ public class Main {
         String ch = sc.nextLine().trim();
 
         if ("1".equals(ch)) {
-            System.out.println("  Category: 1=Individual  2=Group");
-            System.out.print("  Choice: ");
-            String cat = sc.nextLine().trim();
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            String vt = sc.nextLine().trim();
-            String newType;
-            if ("1".equals(cat)) {
-                switch (vt) {
-                    case "1": newType = Appointment.TYPE_FIRST_VISIT; break;
-                    case "2": newType = Appointment.TYPE_FOLLOW_UP;   break;
-                    case "3": newType = Appointment.TYPE_VIRTUAL;     break;
-                    default:  System.out.println("  Invalid.\n"); return;
-                }
-            } else if ("2".equals(cat)) {
-                switch (vt) {
-                    case "1": newType = Appointment.TYPE_GROUP_FIRST_VISIT; break;
-                    case "2": newType = Appointment.TYPE_GROUP_FOLLOW_UP;   break;
-                    case "3": newType = Appointment.TYPE_GROUP_VIRTUAL;     break;
-                    default:  System.out.println("  Invalid.\n"); return;
-                }
-            } else { System.out.println("  Invalid.\n"); return; }
+            String newType = askAppointmentType("  Category: 1=Individual  2=Group");
+            if (newType == null) return;
             apptDAO.updateType(apptId, newType);
             System.out.println("  ✓ Type updated.\n");
 
@@ -623,7 +571,7 @@ public class Main {
     //  SHARED PRIVATE HELPERS
     // ================================================================
 
-    /** Prints a numbered schedule list + reads user choice. Returns null on invalid input. */
+    /** Picks a schedule from list. Returns null on invalid input. */
     private static Schedule pickSchedule(List<Schedule> days, String header, String prompt) {
         System.out.println("\n  ── " + header + " ─────────────────────────────────────");
         for (int i = 0; i < days.size(); i++)
@@ -633,7 +581,7 @@ public class Main {
         return idx == -1 ? null : days.get(idx - 1);
     }
 
-    /** Prints appointment list, reads ID, validates appointment. Returns null on failure. */
+    /** Prints list, reads ID, validates appointment. Returns null on failure. */
     private static Appointment pickAdminAppt(List<Appointment> appts,
                                               AppointmentDAO apptDAO,
                                               UserDAO userDAO,
@@ -650,6 +598,47 @@ public class Main {
         return appt;
     }
 
+    /**
+     * Asks category (Individual/Group) + visit type, returns resolved type string.
+     * Returns null and prints error if input is invalid.
+     */
+    private static String askAppointmentType(String categoryPrompt) {
+        System.out.println(categoryPrompt);
+        System.out.print("  Choice: ");
+        String cat = sc.nextLine().trim();
+        System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
+        System.out.print("  Choice: ");
+        String vt = sc.nextLine().trim();
+        String type = resolveVisitType(cat, vt);
+        if (type == null) System.out.println("  Invalid.\n");
+        return type;
+    }
+
+    /**
+     * Resolves appointment type from category + visit type.
+     * cat: "1"=Individual, "2"=Group
+     * vt:  "1"=First Visit, "2"=Follow-up, "3"=Virtual
+     * Returns null if either is unrecognized.
+     */
+    private static String resolveVisitType(String cat, String vt) {
+        if ("1".equals(cat)) {
+            switch (vt) {
+                case "1": return Appointment.TYPE_FIRST_VISIT;
+                case "2": return Appointment.TYPE_FOLLOW_UP;
+                case "3": return Appointment.TYPE_VIRTUAL;
+                default:  return null;
+            }
+        } else if ("2".equals(cat)) {
+            switch (vt) {
+                case "1": return Appointment.TYPE_GROUP_FIRST_VISIT;
+                case "2": return Appointment.TYPE_GROUP_FOLLOW_UP;
+                case "3": return Appointment.TYPE_GROUP_VIRTUAL;
+                default:  return null;
+            }
+        }
+        return null;
+    }
+
     /** Returns the visitor's future confirmed appointments. */
     private static List<Appointment> getVisitorFutureAppts(User visitor,
                                                             AppointmentDAO apptDAO)
@@ -661,7 +650,7 @@ public class Main {
                 .collect(Collectors.toList());
     }
 
-    /** Prints the future appointments list used in visitorEdit and visitorCancel. */
+    /** Prints future appointment list for visitor edit/cancel. */
     private static void printVisitorApptList(List<Appointment> appts) {
         System.out.println("\n  ── Future Appointments ───────────────────────────────");
         for (Appointment a : appts) {
@@ -673,7 +662,7 @@ public class Main {
         System.out.println();
     }
 
-    /** Prints the within-24h restriction warning for visitor edit/cancel. */
+    /** Prints within-24h warning for visitor edit/cancel. */
     private static void printWithin24hWarning(String verb) {
         System.out.println();
         System.out.println("  ✗ You cannot " + verb + " this appointment because it is less than");
