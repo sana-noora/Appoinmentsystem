@@ -36,7 +36,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          
+     
+      - name: Create .env file for tests ✅
+        run: |
+          echo "EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}" >> .env
+          echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
+     
       - name: Verify JaCoCo report
         run: ls -l target/site/jacoco/
         
