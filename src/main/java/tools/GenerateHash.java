@@ -6,6 +6,7 @@ public class GenerateHash {
 
     public static void main(String[] args) {
 
+        // Read the password from environment variable instead of hardcoding it
         String plainPassword = System.getenv("PLAIN_PASSWORD");
 
         if (plainPassword == null || plainPassword.isEmpty()) {
