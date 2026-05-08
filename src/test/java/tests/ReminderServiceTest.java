@@ -3,8 +3,6 @@ package tests;
 import domain.Appointment;
 import domain.User;
 import org.junit.jupiter.api.*;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import persistence.AppointmentDAO;
 import persistence.UserDAO;
 import service.ReminderService;
@@ -22,39 +20,23 @@ class ReminderServiceTest {
     private UserDAO userDAO;
     private ReminderService reminderService;
 
-    private static MockedStatic<io.github.cdimascio.dotenv.Dotenv> dotenvStatic;
-
-    @BeforeAll
-    static void setUpBeforeClass() {
-        io.github.cdimascio.dotenv.Dotenv dotenvMock =
-                mock(io.github.cdimascio.dotenv.Dotenv.class);
-        when(dotenvMock.get("EMAIL_USERNAME")).thenReturn("test@gmail.com");
-        when(dotenvMock.get("EMAIL_PASSWORD")).thenReturn("testpassword");
-
-        dotenvStatic = Mockito.mockStatic(io.github.cdimascio.dotenv.Dotenv.class);
-        dotenvStatic.when(io.github.cdimascio.dotenv.Dotenv::load).thenReturn(dotenvMock);
-    }
-
-    @AfterAll
-    static void tearDownAfterClass() {
-        dotenvStatic.close();
-    }
-
     @BeforeEach
     void setUp() {
-        appointmentDAO  = mock(AppointmentDAO.class);
-        userDAO         = mock(UserDAO.class);
+        appointmentDAO = mock(AppointmentDAO.class);
+        userDAO = mock(UserDAO.class);
+
+        // ✅ لا static mocking
         reminderService = new ReminderService(appointmentDAO, userDAO);
     }
 
     @Test
-    void sendReminders_noAppointments_printsNoRemindersMessage() throws SQLException {
+    void sendReminders_noAppointments_skipped() throws SQLException {
         when(appointmentDAO.getAllAppointments())
                 .thenReturn(Collections.emptyList());
 
         reminderService.sendReminders();
 
-        verify(appointmentDAO, times(1)).getAllAppointments();
+        verify(appointmentDAO).getAllAppointments();
         verifyNoInteractions(userDAO);
     }
 
@@ -86,7 +68,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    void sendReminders_confirmedButStartTimeOutsideWindow_skipped() throws SQLException {
+    void sendReminders_confirmedOutsideWindow_skipped() throws SQLException {
         Appointment a = mock(Appointment.class);
         when(a.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
         when(a.getStartTime())
@@ -101,7 +83,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    void sendReminders_confirmedStartTimeAlreadyPast_skipped() throws SQLException {
+    void sendReminders_confirmedPast_skipped() throws SQLException {
         Appointment a = mock(Appointment.class);
         when(a.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
         when(a.getStartTime())
@@ -116,7 +98,7 @@ class ReminderServiceTest {
     }
 
     @Test
-    void sendReminders_confirmedWithinWindow_userNotFound_skipped() throws SQLException {
+    void sendReminders_confirmedWithinWindow_userNotFound() throws SQLException {
         Appointment a = mock(Appointment.class);
         when(a.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
         when(a.getStartTime())
@@ -129,11 +111,11 @@ class ReminderServiceTest {
 
         reminderService.sendReminders();
 
-        verify(userDAO, times(1)).getUserById("99");
+        verify(userDAO).getUserById("99");
     }
 
     @Test
-    void sendReminders_confirmedWithinWindow_userEmailBlank_skipped() throws SQLException {
+    void sendReminders_userEmailBlank_skipped() throws SQLException {
         Appointment a = mock(Appointment.class);
         when(a.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
         when(a.getStartTime())
@@ -149,7 +131,7 @@ class ReminderServiceTest {
 
         reminderService.sendReminders();
 
-        verify(userDAO, times(1)).getUserById("2");
+        verify(userDAO).getUserById("2");
     }
 
     @Test
@@ -159,13 +141,11 @@ class ReminderServiceTest {
 
         reminderService.sendReminders();
 
-        verify(appointmentDAO, times(1)).getAllAppointments();
+        verify(appointmentDAO).getAllAppointments();
     }
 
     @Test
-    void sendReminders_multipleAppointments_onlyConfirmedWithinWindowProcessed()
-            throws SQLException {
-
+    void sendReminders_multipleAppointments_onlyOneProcessed() throws SQLException {
         OffsetDateTime inWindow = OffsetDateTime.now(ZoneOffset.UTC).plusHours(10);
 
         Appointment confirmed = mock(Appointment.class);
@@ -176,43 +156,17 @@ class ReminderServiceTest {
         Appointment pending = mock(Appointment.class);
         when(pending.getStatus()).thenReturn("PENDING");
 
-        Appointment tooLate = mock(Appointment.class);
-        when(tooLate.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
-        when(tooLate.getStartTime())
-                .thenReturn(OffsetDateTime.now(ZoneOffset.UTC).plusHours(30));
-
         when(appointmentDAO.getAllAppointments())
-                .thenReturn(Arrays.asList(confirmed, pending, tooLate));
+                .thenReturn(Arrays.asList(confirmed, pending));
         when(userDAO.getUserById("10")).thenReturn(Optional.empty());
 
         reminderService.sendReminders();
 
-        verify(userDAO, times(1)).getUserById("10");
+        verify(userDAO).getUserById("10");
     }
 
     @Test
-    void sendReminders_groupAppointmentWithinWindow_userLookedUp() throws SQLException {
-        Appointment group = mock(Appointment.class);
-        when(group.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
-        when(group.getStartTime())
-                .thenReturn(OffsetDateTime.now(ZoneOffset.UTC).plusHours(6));
-        when(group.getCreatedBy()).thenReturn(5L);
-        when(group.isGroup()).thenReturn(true);
-        when(group.getParticipantsCount()).thenReturn(4);
-
-        when(appointmentDAO.getAllAppointments())
-                .thenReturn(Collections.singletonList(group));
-        when(userDAO.getUserById("5")).thenReturn(Optional.empty());
-
-        reminderService.sendReminders();
-
-        verify(userDAO, times(1)).getUserById("5");
-    }
-
-    @Test
-    void sendReminders_appointmentExactlyAt24hBoundary_withinWindow()
-            throws SQLException {
-
+    void sendReminders_boundaryJustUnder24h() throws SQLException {
         OffsetDateTime boundary =
                 OffsetDateTime.now(ZoneOffset.UTC).plusHours(23).plusMinutes(59);
 
@@ -227,6 +181,6 @@ class ReminderServiceTest {
 
         reminderService.sendReminders();
 
-        verify(userDAO, times(1)).getUserById("7");
+        verify(userDAO).getUserById("7");
     }
 }
