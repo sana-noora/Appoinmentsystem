@@ -1,4 +1,5 @@
 name: Build and Analyze
+
 on:
   push:
     branches: [ main ]
@@ -27,26 +28,24 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-     
-      - name: Create .env file for tests ✅
+
+      # ✅ مهم جدًا: إنشاء .env قبل تشغيل التستات
+      - name: Create .env file for tests
         run: |
-          echo "EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}" >> .env
+          echo "EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}" > .env
           echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
-     
-      - name: Verify JaCoCo report
-        run: ls -l target/site/jacoco/
-        
+
       - name: Cache Maven packages
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        uses: actions/cache@v4
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -64,7 +63,7 @@ jobs:
         run: mvn dependency:copy-dependencies -DoutputDirectory=target/dependency
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@2500896589ef8f7247069a56136f8dc177c27ccf
+        uses: SonarSource/sonarqube-scan-action@v2
         with:
           args: >
             -Dsonar.projectKey=sana-noora_Appoinmentsystem
@@ -75,6 +74,6 @@ jobs:
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
