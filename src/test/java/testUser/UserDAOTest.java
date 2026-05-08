@@ -23,15 +23,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserDAOTest {
 
     // =====================================================
-    // Constants - لتجنب hardcoded values
+    // Constants
     // =====================================================
-    private static final String TEST_USERNAME     = "aliuser";
+    private static final String TEST_USERNAME    = "aliuser";
+    private static final String TEST_EMAIL       = "ali@test.com";
+    private static final String TEST_PHONE       = "123456";
+    private static final String TEST_ROLE        = "VISITOR";
+    private static final String TEST_EMAIL_FIELD = "email";
+    private static final String TEST_PHONE_FIELD = "phone_number";
+    private static final String TEST_USER_FIELD  = "username";
+
     private static final String TEST_RAW_PASS     =
-            System.getenv().getOrDefault("TEST_RAW_PASS", "t3stP@ssw0rd!");
+            System.getenv().getOrDefault("TEST_RAW_PASS",     "t3stP@ssw0rd!");
     private static final String TEST_CORRECT_PASS =
             System.getenv().getOrDefault("TEST_CORRECT_PASS", "c0rr3ctP@ss!");
     private static final String TEST_WRONG_PASS   =
-            System.getenv().getOrDefault("TEST_WRONG_PASS", "wr0ngP@ss!");
+            System.getenv().getOrDefault("TEST_WRONG_PASS",   "wr0ngP@ss!");
 
     @Mock private Connection        connection;
     @Mock private PreparedStatement preparedStatement;
@@ -54,18 +61,14 @@ class UserDAOTest {
                 .thenReturn(preparedStatement);
 
         User user = new User(
-                "1",
-                "Ali",
-                "ali@test.com",
-                "123456",
-                TEST_USERNAME,
-                User.Role.VISITOR
+                "1", "Ali", TEST_EMAIL,
+                TEST_PHONE, TEST_USERNAME, User.Role.VISITOR
         );
 
         userDAO.addUser(user, TEST_RAW_PASS);
 
         verify(preparedStatement).executeUpdate();
-        verify(preparedStatement).setString(eq(6), eq("VISITOR"));
+        verify(preparedStatement).setString(eq(6), eq(TEST_ROLE));
     }
 
     // =====================================================
@@ -83,10 +86,10 @@ class UserDAOTest {
         when(resultSet.getString("password_hash")).thenReturn(hash);
         when(resultSet.getInt("id")).thenReturn(1);
         when(resultSet.getString("name")).thenReturn("Ali");
-        when(resultSet.getString("email")).thenReturn("ali@test.com");
-        when(resultSet.getString("phone_number")).thenReturn("123456");
-        when(resultSet.getString("username")).thenReturn(TEST_USERNAME);
-        when(resultSet.getString("role")).thenReturn("VISITOR");
+        when(resultSet.getString(TEST_EMAIL_FIELD)).thenReturn(TEST_EMAIL);
+        when(resultSet.getString(TEST_PHONE_FIELD)).thenReturn(TEST_PHONE);
+        when(resultSet.getString(TEST_USER_FIELD)).thenReturn(TEST_USERNAME);
+        when(resultSet.getString("role")).thenReturn(TEST_ROLE);
 
         Optional<User> result = userDAO.login(TEST_USERNAME, TEST_RAW_PASS);
 
@@ -132,10 +135,10 @@ class UserDAOTest {
 
         when(resultSet.getInt("id")).thenReturn(1);
         when(resultSet.getString("name")).thenReturn("Ali");
-        when(resultSet.getString("email")).thenReturn("ali@test.com");
-        when(resultSet.getString("phone_number")).thenReturn("123456");
-        when(resultSet.getString("username")).thenReturn(TEST_USERNAME);
-        when(resultSet.getString("role")).thenReturn("VISITOR");
+        when(resultSet.getString(TEST_EMAIL_FIELD)).thenReturn(TEST_EMAIL);
+        when(resultSet.getString(TEST_PHONE_FIELD)).thenReturn(TEST_PHONE);
+        when(resultSet.getString(TEST_USER_FIELD)).thenReturn(TEST_USERNAME);
+        when(resultSet.getString("role")).thenReturn(TEST_ROLE);
 
         Optional<User> result = userDAO.getUserById("1");
 
@@ -167,11 +170,13 @@ class UserDAOTest {
         when(resultSet.next()).thenReturn(true, true, false);
         when(resultSet.getInt("id")).thenReturn(1, 2);
         when(resultSet.getString("name")).thenReturn("Ali", "Noora");
-        when(resultSet.getString("email")).thenReturn("ali@test.com", "admin@test.com");
-        when(resultSet.getString("phone_number")).thenReturn("123", "456");
-        when(resultSet.getString("username"))
+        when(resultSet.getString(TEST_EMAIL_FIELD))
+                .thenReturn(TEST_EMAIL, "admin@test.com");
+        when(resultSet.getString(TEST_PHONE_FIELD))
+                .thenReturn("123", "456");
+        when(resultSet.getString(TEST_USER_FIELD))
                 .thenReturn(TEST_USERNAME, "adminuser");
-        when(resultSet.getString("role")).thenReturn("VISITOR", "ADMIN");
+        when(resultSet.getString("role")).thenReturn(TEST_ROLE, "ADMIN");
 
         List<User> users = userDAO.getAllUsers();
 
