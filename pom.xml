@@ -20,7 +20,13 @@
         <sonar.projectKey>sana-noora_Appoinmentsystem</sonar.projectKey>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
-        <!-- ✅ استثناء المجلدات والملفات غير المهمة -->
+        <!-- استثناء الملفات غير المهمة -->
+        <sonar.exclusions>
+            **/doc/**,
+            **/docs/**,
+            **/target/site/**
+        </sonar.exclusions>
+
         <sonar.coverage.exclusions>
             **/src/test/java/**,
             **/doc/**,
@@ -34,6 +40,7 @@
         <sonar.coverage.jacoco.xmlReportPaths>
             target/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
+
     </properties>
 
     <dependencies>
@@ -118,7 +125,6 @@
                 </executions>
             </plugin>
 
-<!-- nn -->
             <!-- Jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
