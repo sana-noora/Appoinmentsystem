@@ -164,6 +164,47 @@ class ReminderServiceTest {
 
         verify(userDAO).getUserById("10");
     }
+    
+    @Test
+    void sendReminders_confirmedWithinWindow_validUser_sendsEmail() throws SQLException {
+        OffsetDateTime inWindow = OffsetDateTime.now(ZoneOffset.UTC).plusHours(5);
+
+        Appointment a = mock(Appointment.class);
+        when(a.getStatus()).thenReturn(Appointment.STATUS_CONFIRMED);
+        when(a.getStartTime()).thenReturn(inWindow);
+        when(a.getEndTime()).thenReturn(inWindow.plusMinutes(30));
+        when(a.getCreatedBy()).thenReturn(1L);
+        when(a.getType()).thenReturn("FIRST_VISIT");
+        when(a.isGroup()).thenReturn(false);
+
+        User u = mock(User.class);
+        when(u.getEmail()).thenReturn("test@example.com");
+        when(u.getName()).thenReturn("Noora");
+
+        when(appointmentDAO.getAllAppointments()).thenReturn(Collections.singletonList(a));
+        when(userDAO.getUserById("1")).thenReturn(Optional.of(u));
+
+        ReminderService spyService = spy(reminderService);
+        doNothing().when(spyService).sendEmail(any(User.class), any(Appointment.class));
+
+        spyService.sendReminders();
+
+        verify(spyService).sendEmail(u, a);
+    }
+    
+    @Test
+    void friendlyType_allVariantsCovered() {
+        Assertions.assertEquals("Individual – First Visit", reminderService.friendlyType("FIRST_VISIT"));
+        Assertions.assertEquals("Individual – Follow-up", reminderService.friendlyType("FOLLOW_UP"));
+        Assertions.assertEquals("Individual – Virtual", reminderService.friendlyType("VIRTUAL"));
+        Assertions.assertEquals("Group – First Visit", reminderService.friendlyType("GROUP_FIRST_VISIT"));
+        Assertions.assertEquals("Group – Follow-up", reminderService.friendlyType("GROUP_FOLLOW_UP"));
+        Assertions.assertEquals("Group – Virtual", reminderService.friendlyType("GROUP_VIRTUAL"));
+        Assertions.assertEquals("Unknown", reminderService.friendlyType(null));
+        Assertions.assertEquals("OTHER", reminderService.friendlyType("OTHER"));
+    }
+
+
 
     @Test
     void sendReminders_boundaryJustUnder24h() throws SQLException {
