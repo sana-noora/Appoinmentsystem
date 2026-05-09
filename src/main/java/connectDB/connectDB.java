@@ -5,6 +5,10 @@ import java.sql.SQLException;
 
 public class connectDB {
 
+    private connectDB() {
+        // Prevent instantiation
+    }
+
     private static final String URL  =
             "jdbc:postgresql://localhost:5432/appointment_system";
 
@@ -18,4 +22,3 @@ public class connectDB {
         return DriverManager.getConnection(URL, USER, PASS);
     }
 }
-
