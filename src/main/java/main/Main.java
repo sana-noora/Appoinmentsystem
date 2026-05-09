@@ -227,7 +227,7 @@ public class Main {
                 + " - Note: " + (note.isEmpty() ? "none" : note));
     }
 
-    // ── ADMIN 3: Edit appointment ────────────────────────────────────
+ // ── ADMIN 3: Edit appointment ────────────────────────────────────
     private static void adminEditAppointment(AppointmentDAO apptDAO,
                                              ScheduleDAO schedDAO,
                                              UserDAO userDAO) throws SQLException {
@@ -257,41 +257,51 @@ public class Main {
         System.out.print("  Choice: ");
         String ch = sc.nextLine().trim();
 
-        String newType  = null;
-        int    newCount = -1;
-
         if ("1".equals(ch)) {
-            newType = askAppointmentType("  New category: 1=Individual  2=Group");
-            if (newType == null) return;
-
+            applyEditType(appt, apptDAO);
         } else if ("2".equals(ch)) {
-            if (!appt.isGroup()) {
-                System.out.println("  Participant count is only for Group appointments.\n");
-                logger.warning("Admin attempted to change participant count on non-group appointment");
-                return;
-            }
-            System.out.print("  New participant count (1-" + MAX_GROUP + "): ");
-            newCount = readInt(1, MAX_GROUP);
-            if (newCount == -1) return;
+            applyEditCount(appt, apptDAO);
         } else {
             System.out.println("  Invalid choice.\n");
             logger.warning("Invalid edit choice in admin edit appointment");
-            return;
         }
+    }
+
+    /** Handles changing the appointment type (Individual/Group). */
+    private static void applyEditType(Appointment appt,
+                                       AppointmentDAO apptDAO) throws SQLException {
+        String newType = askAppointmentType("  New category: 1=Individual  2=Group");
+        if (newType == null) return;
 
         System.out.print("  Note / reason for user: ");
         String note = sc.nextLine().trim();
         if (note.isEmpty()) note = null;
 
-        if (newType != null)
-            apptDAO.updateTypeAndNote(appt.getId(), newType, note);
-        else
-            apptDAO.updateParticipantsAndNote(appt.getId(), newCount, note);
-
+        apptDAO.updateTypeAndNote(appt.getId(), newType, note);
         System.out.println("  ✓ Appointment updated.\n");
-        logger.info("Admin updated appointment ID: " + appt.getId()
-                + " - Type: " + (newType != null ? newType : "unchanged")
-                + ", Count: " + (newCount > 0 ? newCount : "unchanged"));
+        logger.info("Admin updated appointment ID: " + appt.getId() + " - Type: " + newType);
+    }
+
+    /** Handles changing the participant count (Group appointments only). */
+    private static void applyEditCount(Appointment appt,
+                                        AppointmentDAO apptDAO) throws SQLException {
+        if (!appt.isGroup()) {
+            System.out.println("  Participant count is only for Group appointments.\n");
+            logger.warning("Admin attempted to change participant count on non-group appointment");
+            return;
+        }
+
+        System.out.print("  New participant count (1-" + MAX_GROUP + "): ");
+        int newCount = readInt(1, MAX_GROUP);
+        if (newCount == -1) return;
+
+        System.out.print("  Note / reason for user: ");
+        String note = sc.nextLine().trim();
+        if (note.isEmpty()) note = null;
+
+        apptDAO.updateParticipantsAndNote(appt.getId(), newCount, note);
+        System.out.println("  ✓ Appointment updated.\n");
+        logger.info("Admin updated appointment ID: " + appt.getId() + " - Count: " + newCount);
     }
 
     // ── ADMIN 4: Add work day ────────────────────────────────────────
@@ -744,7 +754,7 @@ public class Main {
 
         System.out.println("  ✓ Appointment canceled. Slot is now free. No penalty applied.\n");
         logger.info("Visitor " + visitor.getUsername() + " cancelled appointment ID: " + apptId);
-    }
+    } 
 
     // ================================================================
     //  SHARED PRIVATE HELPERS
