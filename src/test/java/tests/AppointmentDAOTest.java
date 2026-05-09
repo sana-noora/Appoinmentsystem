@@ -40,7 +40,6 @@ class AppointmentDAOTest {
 
     // =====================================================
     // markPastAppointmentsDone
-    // =====================================================
 
     @Test
     void markPastAppointmentsDoneShouldExecuteUpdate() throws SQLException {
