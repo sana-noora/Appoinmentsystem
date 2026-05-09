@@ -74,7 +74,7 @@ public class ReminderService {
         }
     }
 
-    private void sendEmail(User user, Appointment appointment) {
+    public void sendEmail(User user, Appointment appointment) {
         Properties props = new Properties();
         props.put("mail.smtp.auth",            "true");
         props.put("mail.smtp.starttls.enable", "true");
@@ -131,7 +131,7 @@ public class ReminderService {
         return sb.toString();
     }
 
-    private String friendlyType(String t) {
+    public String friendlyType(String t) {
         if (t == null) return "Unknown";
         switch (t.toUpperCase()) {
             case "FIRST_VISIT":       return "Individual – First Visit";

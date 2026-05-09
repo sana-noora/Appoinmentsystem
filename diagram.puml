@@ -1,0 +1,244 @@
+@startuml
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #555555
+
+' ══════════════════════════════
+'  ENUMS
+' ══════════════════════════════
+
+enum Role {
+  ADMIN
+  VISITOR
+}
+
+' ══════════════════════════════
+'  DOMAIN LAYER
+' ══════════════════════════════
+
+class User {
+  - id: String
+  - name: String
+  - email: String
+  - phoneNumber: String
+  - username: String
+  - role: Role
+  - loggedIn: boolean
+  --
+  + markLoggedIn(): void
+  + logout(): void
+  + isLoggedIn(): boolean
+  + getId(): String
+  + getName(): String
+  + getEmail(): String
+  + getPhoneNumber(): String
+  + getUsername(): String
+  + getRole(): Role
+}
+
+class Admin {
+  --
+  + viewWorkDays(): List<Schedule>
+  + addWorkDay(workDate: LocalDate): long
+  + viewAvailableSlots(): List<TimeSlot>
+  + viewAvailableSlotsByDay(scheduleId: long): List<TimeSlot>
+  + addSlot(scheduleId: long, start: OffsetDateTime, end: OffsetDateTime): long
+  + setSlotAvailability(slotId: long, available: boolean): boolean
+  + cancelAppointmentWithNote(appointmentId: long, note: String, tsDAO: TimeSlotDAO): boolean
+  + modifyAppointmentWithNote(appointmentId: long, newCount: int, note: String): boolean
+  + validateDuration(a: Appointment): boolean
+  + validateCapacity(a: Appointment): boolean
+  + validateType(a: Appointment): boolean
+}
+
+class Appointment {
+  - id: long
+  - type: String
+  - status: String
+  - startTime: OffsetDateTime
+  - endTime: OffsetDateTime
+  - participantsCount: int
+  - maxParticipants: int
+  - createdBy: long
+  - slotId: Long
+  - adminNote: String
+  - canceledByAdmin: boolean
+  - createdAt: OffsetDateTime
+  - updatedAt: OffsetDateTime
+  --
+  + {static} TYPE_FIRST_VISIT: String
+  + {static} TYPE_FOLLOW_UP: String
+  + {static} TYPE_VIRTUAL: String
+  + {static} TYPE_GROUP_FIRST_VISIT: String
+  + {static} TYPE_GROUP_FOLLOW_UP: String
+  + {static} TYPE_GROUP_VIRTUAL: String
+  + {static} STATUS_PENDING: String
+  + {static} STATUS_CONFIRMED: String
+  + {static} STATUS_CANCELED: String
+  + {static} STATUS_DONE: String
+  --
+  + isGroup(): boolean
+  + getId(): long
+  + getType(): String
+  + getStatus(): String
+  + getStartTime(): OffsetDateTime
+  + getEndTime(): OffsetDateTime
+  + getParticipantsCount(): int
+  + getMaxParticipants(): int
+  + getCreatedBy(): long
+  + getSlotId(): Long
+  + getAdminNote(): String
+  + isCanceledByAdmin(): boolean
+}
+
+class Schedule {
+  - id: long
+  - workDate: LocalDate
+  - createdAt: OffsetDateTime
+  --
+  + getId(): long
+  + getWorkDate(): LocalDate
+  + getCreatedAt(): OffsetDateTime
+}
+
+class TimeSlot {
+  - id: long
+  - scheduleId: long
+  - startTime: OffsetDateTime
+  - endTime: OffsetDateTime
+  - available: boolean
+  --
+  + getId(): long
+  + getScheduleId(): long
+  + getStartTime(): OffsetDateTime
+  + getEndTime(): OffsetDateTime
+  + isAvailable(): boolean
+  + setAvailable(a: boolean): void
+}
+
+' ══════════════════════════════
+'  PERSISTENCE LAYER
+' ══════════════════════════════
+
+class connectDB {
+  - {static} URL: String
+  - {static} USER: String
+  - {static} PASS: String
+  --
+  + {static} getConnection(): Connection
+}
+
+class AppointmentDAO {
+  - connection: Connection
+  --
+  + addAppointment(appointment: Appointment): void
+  + getAppointmentById(id: long): Appointment
+  + getAllAppointments(): List<Appointment>
+  + getActiveAppointmentsByDate(date: LocalDate): List<Appointment>
+  + getFutureAppointmentsByDate(date: LocalDate): List<Appointment>
+  + getAppointmentsByUser(userId: long): List<Appointment>
+  + updateStatus(id: long, newStatus: String): int
+  + updateStatusAndNote(id: long, newStatus: String, note: String): int
+  + updateParticipants(id: long, newCount: int): int
+  + updateParticipantsAndNote(id: long, newCount: int, note: String): int
+  + updateTypeAndNote(id: long, newType: String, note: String): int
+  + updateType(id: long, newType: String): int
+  + updateSlotAndTime(id: long, newSlotId: long, newStart: OffsetDateTime, newEnd: OffsetDateTime): int
+  + deleteAppointment(id: long): void
+  + markPastAppointmentsDone(): void
+}
+
+class ScheduleDAO {
+  - connection: Connection
+  --
+  + addSchedule(schedule: Schedule): long
+  + existsByDate(date: LocalDate): boolean
+  + getScheduleById(id: long): Schedule
+  + getScheduleByDate(date: LocalDate): Schedule
+  + getAllSchedules(): List<Schedule>
+  + getFutureSchedules(): List<Schedule>
+  + deleteSchedule(id: long): void
+}
+
+class TimeSlotDAO {
+  - connection: Connection
+  --
+  + addTimeSlot(slot: TimeSlot): long
+  + existsByScheduleAndStart(scheduleId: long, start: OffsetDateTime): boolean
+  + getTimeSlotById(id: long): TimeSlot
+  + getAllTimeSlots(): List<TimeSlot>
+  + getAllSlotsBySchedule(scheduleId: long): List<TimeSlot>
+  + getAllSlotsByDate(date: LocalDate): List<TimeSlot>
+  + getAvailableSlots(): List<TimeSlot>
+  + getAvailableSlotsByScheduleId(scheduleId: long): List<TimeSlot>
+  + updateAvailability(id: long, available: boolean): int
+  + getBookedByUsername(slotId: long): String
+  + deleteTimeSlot(id: long): void
+}
+
+class UserDAO {
+  - connection: Connection
+  --
+  + addUser(user: User, rawPassword: String): void
+  + login(username: String, plainPassword: String): Optional<User>
+  + getUserById(id: String): Optional<User>
+  + getAllUsers(): List<User>
+}
+
+' ══════════════════════════════
+'  SERVICE LAYER
+' ══════════════════════════════
+
+class ReminderService {
+  - {static} SMTP_HOST: String
+  - {static} SMTP_PORT: int
+  - senderEmail: String
+  - senderPassword: String
+  - appointmentDAO: AppointmentDAO
+  - userDAO: UserDAO
+  --
+  + sendReminders(): void
+  - sendEmail(user: User, appointment: Appointment): void
+  - buildBody(user: User, appointment: Appointment): String
+  - friendlyType(t: String): String
+}
+
+' ══════════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════════
+
+' Inheritance (Admin extends User)
+User <|-- Admin
+
+' User has a Role (composition-like enum association)
+User --> Role
+
+' Admin uses DAOs (composition — injected via constructor)
+Admin *-- AppointmentDAO
+Admin *-- TimeSlotDAO
+Admin *-- ScheduleDAO
+
+' ReminderService uses DAOs (composition)
+ReminderService *-- AppointmentDAO
+ReminderService *-- UserDAO
+
+' DAOs work on domain objects (dependency)
+AppointmentDAO ..> Appointment : <<manages>>
+ScheduleDAO    ..> Schedule    : <<manages>>
+TimeSlotDAO    ..> TimeSlot    : <<manages>>
+UserDAO        ..> User        : <<manages>>
+
+' DAOs depend on connectDB for Connection
+AppointmentDAO ..> connectDB : <<uses>>
+ScheduleDAO    ..> connectDB : <<uses>>
+TimeSlotDAO    ..> connectDB : <<uses>>
+UserDAO        ..> connectDB : <<uses>>
+
+' Domain associations
+Appointment "many" --o "1" User       : createdBy >
+Appointment "many" --o "0..1" TimeSlot : linked to >
+TimeSlot    "many" --o "1" Schedule   : belongs to >
+
+@enduml
