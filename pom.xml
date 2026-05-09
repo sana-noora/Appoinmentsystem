@@ -15,26 +15,28 @@
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- Sonar -->
+        <!-- SonarCloud -->
         <sonar.organization>sana-noora</sonar.organization>
         <sonar.projectKey>sana-noora_Appoinmentsystem</sonar.projectKey>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
 
-        <!-- ❗️THE IMPORTANT FIX -->
-        <sonar.coverage.exclusions>     
- **/src/test/java/**,
-    **/doc/**,
-    **/GenerateHash.java,
-    **/presentaion/**
-     </sonar.coverage.exclusions>
+        <!-- ✅ استثناء المجلدات والملفات غير المهمة -->
+        <sonar.coverage.exclusions>
+            **/src/test/java/**,
+            **/doc/**,
+            **/doc/**/*.java,
+            **/GenerateHash.java,
+            **/presentation/**,
+            **/presentation/**/*.java
+        </sonar.coverage.exclusions>
 
+        <!-- تقرير JaCoCo -->
         <sonar.coverage.jacoco.xmlReportPaths>
             target/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencies>
-
         <!-- PostgreSQL -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -64,7 +66,7 @@
         </dependency>
 
         <!-- JUnit -->
-       <dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.7.2</version>
@@ -84,12 +86,10 @@
             <version>3.12.4</version>
             <scope>test</scope>
         </dependency>
-
     </dependencies>
 
     <build>
         <plugins>
-
             <!-- Surefire -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -97,7 +97,7 @@
                 <version>3.2.5</version>
             </plugin>
 
-            <!-- ✅ JaCoCo FIXED -->
+            <!-- JaCoCo -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -131,8 +131,6 @@
                     </archive>
                 </configuration>
             </plugin>
-
         </plugins>
     </build>
-
 </project>
