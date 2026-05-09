@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.io.*;
+import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
@@ -26,9 +27,9 @@ import persistence.*;
  * - Visitor operations (book, view, edit, cancel appointments)
  * - Edge cases and error handling
  * - SonarCloud compliance (logging, encapsulation, null handling)
- *
- * NOTE: All tests use System.setIn() with ByteArrayInputStream to feed input
- * to the static Scanner. No reflection is used to modify Scanner fields.
+ * 
+ * NOTE: Tests use System.setIn() with ByteArrayInputStream to feed input to the
+ * static Scanner without using reflection. This avoids IllegalAccessException.
  */
 class MainTest {
 
@@ -113,16 +114,16 @@ class MainTest {
      * Invokes a private method on Main class using reflection.
      */
     private Object call(String method, Class<?>[] types, Object... args) throws Exception {
-        java.lang.reflect.Method m = main.Main.class.getDeclaredMethod(method, types);
+        Method m = main.Main.class.getDeclaredMethod(method, types);
         m.setAccessible(true);
         return m.invoke(null, args);
     }
 
     /**
-     * Feeds input to System.in via ByteArrayInputStream.
-     * This method replaces System.in so that Scanner reads from the provided string.
+     * Feeds input to System.in using ByteArrayInputStream.
+     * This allows Scanner.nextLine() calls in Main to read the provided input.
      * 
-     * @param input the input string to feed (lines separated by \n)
+     * @param input the input string (use \n to separate multiple lines)
      */
     private void feedInput(String input) {
         System.setIn(new ByteArrayInputStream(input.getBytes()));
