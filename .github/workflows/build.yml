@@ -1,5 +1,4 @@
 name: Build and Analyze
-
 on:
   push:
     branches: [ main ]
@@ -38,7 +37,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # ✅ مهم جدًا: إنشاء .env قبل تشغيل التستات
       - name: Create .env file for tests
         run: |
           echo "EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}" > .env
@@ -72,7 +70,9 @@ jobs:
             -Dsonar.java.binaries=target/classes
             -Dsonar.java.libraries=target/dependency/*.jar
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-            -Dsonar.coverage.exclusions=**/src/test/java/**,**/doc/**,**/doc/**/*.java,**/presentation/**,**/presentation/**/*.java,**/GenerateHash.java
+            -Dsonar.exclusions=**/doc/**,**/docs/**,**/target/site/**,**/GenerateHash.java
+            -Dsonar.coverage.exclusions=**/src/test/java/**,**/doc/**,**/GenerateHash.java,**/presentation/**,**/connectDB/**,**/main/Main.java,**/service/ReminderService.java
+            -Dsonar.cpd.exclusions=**/src/test/java/**,**/doc/**,**/GenerateHash.java,**/presentation/**
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

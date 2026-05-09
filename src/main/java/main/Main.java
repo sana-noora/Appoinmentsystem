@@ -21,6 +21,7 @@ import service.ReminderService;
 
 public class Main {
 
+	private static final String PROMPT_CHOICE = "  Choice: ";
     private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String OWNER_EMAIL = "nooraqaradeh3@gmail.com";
     private static final int    MAX_GROUP   = 5;
@@ -254,7 +255,7 @@ public class Main {
         System.out.println("\n  What to edit?");
         System.out.println("    1. Change appointment type (Individual/Group)");
         System.out.println("    2. Change participant count (Group only)");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String ch = sc.nextLine().trim();
 
         if ("1".equals(ch)) {
@@ -568,49 +569,49 @@ public class Main {
      * Asks the visitor to choose Individual or Group, then the visit sub-type.
      * Returns null if any input is invalid.
      */
-    private static BookingTypeResult resolveBookingType(User visitor) {
-        System.out.println("  Appointment type: 1=Individual  2=Group");
-        System.out.print("  Choice: ");
-        String cat = sc.nextLine().trim();
+   private static BookingTypeResult resolveBookingType(User visitor) {
+    System.out.println("  Appointment type: 1=Individual  2=Group");
+    System.out.print(PROMPT_CHOICE);
+    String cat = sc.nextLine().trim();
 
-        if ("1".equals(cat)) {
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            String apptType = resolveVisitType("1", sc.nextLine().trim());
-            if (apptType == null) {
-                System.out.println("  Invalid type.\n");
-                logger.warning("Visitor " + visitor.getUsername()
-                        + ": Invalid individual visit type");
-                return null;
-            }
-            return new BookingTypeResult(apptType, 1, 1);
+    if ("1".equals(cat)) {
+        System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
+        System.out.print(PROMPT_CHOICE);
+        String apptType = resolveVisitType("1", sc.nextLine().trim());
+        if (apptType == null) {
+            System.out.println("  Invalid type.\n");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Invalid individual visit type");
+            return null;
         }
-
-        if ("2".equals(cat)) {
-            System.out.print("  Number of participants (1-" + MAX_GROUP + "): ");
-            int participants = readInt(1, MAX_GROUP);
-            if (participants == -1) {
-                System.out.println("  ✗ Group cannot exceed 5 participants.\n");
-                logger.warning("Visitor " + visitor.getUsername()
-                        + ": Invalid group participant count");
-                return null;
-            }
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            String apptType = resolveVisitType("2", sc.nextLine().trim());
-            if (apptType == null) {
-                System.out.println("  Invalid type.\n");
-                logger.warning("Visitor " + visitor.getUsername()
-                        + ": Invalid group visit type");
-                return null;
-            }
-            return new BookingTypeResult(apptType, participants, MAX_GROUP);
-        }
-
-        System.out.println("  Invalid category.\n");
-        logger.warning("Visitor " + visitor.getUsername() + ": Invalid appointment category");
-        return null;
+        return new BookingTypeResult(apptType, 1, 1);
     }
+
+    if ("2".equals(cat)) {
+        System.out.print("  Number of participants (1-" + MAX_GROUP + "): ");
+        int participants = readInt(1, MAX_GROUP);
+        if (participants == -1) {
+            System.out.println("  ✗ Group cannot exceed 5 participants.\n");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Invalid group participant count");
+            return null;
+        }
+        System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
+        System.out.print(PROMPT_CHOICE);
+        String apptType = resolveVisitType("2", sc.nextLine().trim());
+        if (apptType == null) {
+            System.out.println("  Invalid type.\n");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Invalid group visit type");
+            return null;
+        }
+        return new BookingTypeResult(apptType, participants, MAX_GROUP);
+    }
+
+    System.out.println("  Invalid category.\n");
+    logger.warning("Visitor " + visitor.getUsername() + ": Invalid appointment category");
+    return null;
+}
 
     // ── VISITOR 2: My appointments ───────────────────────────────────
     private static void visitorMyAppointments(User visitor,
@@ -704,7 +705,7 @@ public class Main {
         }
 
         System.out.println("  What to change? 1=Appointment type  2=Visitor count (Group only)");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String ch = sc.nextLine().trim();
 
         if ("1".equals(ch)) {
@@ -812,10 +813,10 @@ public class Main {
 
     private static String askAppointmentType(String categoryPrompt) {
         System.out.println(categoryPrompt);
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String cat = sc.nextLine().trim();
         System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String vt = sc.nextLine().trim();
         String type = resolveVisitType(cat, vt);
         if (type == null) {
