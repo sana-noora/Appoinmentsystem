@@ -21,6 +21,7 @@ import service.ReminderService;
 
 public class Main {
 
+	private static final String PROMPT_CHOICE = "  Choice: ";
     private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String OWNER_EMAIL = "nooraqaradeh3@gmail.com";
     private static final int    MAX_GROUP   = 5;
@@ -254,7 +255,7 @@ public class Main {
         System.out.println("\n  What to edit?");
         System.out.println("    1. Change appointment type (Individual/Group)");
         System.out.println("    2. Change participant count (Group only)");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String ch = sc.nextLine().trim();
 
         String newType  = null;
@@ -515,7 +516,7 @@ public class Main {
         OffsetDateTime end   = start.plusMinutes(dur);
 
         System.out.println("  Appointment type: 1=Individual  2=Group");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String cat = sc.nextLine().trim();
 
         String apptType;
@@ -523,7 +524,7 @@ public class Main {
 
         if ("1".equals(cat)) {
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
+            System.out.print(PROMPT_CHOICE);
             apptType = resolveVisitType("1", sc.nextLine().trim());
             if (apptType == null) {
                 System.out.println("  Invalid type.\n");
@@ -541,7 +542,7 @@ public class Main {
                 return;
             }
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
+            System.out.print(PROMPT_CHOICE);
             apptType = resolveVisitType("2", sc.nextLine().trim());
             if (apptType == null) {
                 System.out.println("  Invalid type.\n");
@@ -670,7 +671,7 @@ public class Main {
         }
 
         System.out.println("  What to change? 1=Appointment type  2=Visitor count (Group only)");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String ch = sc.nextLine().trim();
 
         if ("1".equals(ch)) {
@@ -778,10 +779,10 @@ public class Main {
 
     private static String askAppointmentType(String categoryPrompt) {
         System.out.println(categoryPrompt);
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String cat = sc.nextLine().trim();
         System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-        System.out.print("  Choice: ");
+        System.out.print(PROMPT_CHOICE);
         String vt = sc.nextLine().trim();
         String type = resolveVisitType(cat, vt);
         if (type == null) {
