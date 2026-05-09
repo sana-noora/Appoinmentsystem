@@ -27,6 +27,12 @@ public class Main {
     
     private static final Scanner sc = new Scanner(System.in);
 
+    /**
+     * Provides public access to the Scanner for testing and internal purposes.
+     * The Scanner instance itself is immutable; this method only exposes access to it.
+     * 
+     * @return the static Scanner instance bound to System.in
+     */
     public static Scanner getScanner() {
         return sc;
     }
@@ -164,7 +170,7 @@ public class Main {
         }
 
         System.out.println("\n  ── Appointments on " + chosen.getWorkDate().format(DISPLAY_DATE)
-                + " ─────────────────────────────────────");
+                + " ──────────────────────────────────��──");
         logger.info("Admin viewing appointments for: " + chosen.getWorkDate());
         
         for (Appointment a : appts) {
@@ -283,7 +289,7 @@ public class Main {
     private static void adminAddWorkDay(ScheduleDAO schedDAO) throws SQLException {
         List<Schedule> future = schedDAO.getFutureSchedules();
         if (!future.isEmpty()) {
-            System.out.println("\n  ── Current & Future Work Days ──��─────────────────");
+            System.out.println("\n  ── Current & Future Work Days ──────────────────────");
             for (Schedule s : future)
                 System.out.println("    " + s.getWorkDate().format(DISPLAY_DATE));
         }

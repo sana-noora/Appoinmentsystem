@@ -27,6 +27,8 @@ import persistence.*;
  * - Visitor operations (book, view, edit, cancel appointments)
  * - Edge cases and error handling
  * - SonarCloud compliance (logging, encapsulation, null handling)
+ *
+ * Uses System.setIn() for input injection instead of reflection to avoid IllegalAccessException.
  */
 class MainTest {
 
@@ -117,19 +119,11 @@ class MainTest {
     }
 
     /**
-     * Feeds input to Scanner for interactive tests.
+     * Feeds input to Scanner by replacing System.in.
+     * This is the safe, non-reflection approach that avoids IllegalAccessException.
      */
-    private void feedInput(String input) throws Exception {
+    private void feedInput(String input) {
         System.setIn(new ByteArrayInputStream(input.getBytes()));
-        Scanner newScanner = new java.util.Scanner(System.in);
-        // Replace scanner via reflection
-        java.lang.reflect.Field field = main.Main.class.getDeclaredField("sc");
-        field.setAccessible(true);
-        Scanner oldScanner = (Scanner) field.get(null);
-        if (oldScanner != null) {
-            oldScanner.close();
-        }
-        field.set(null, newScanner);
     }
 
     /**
