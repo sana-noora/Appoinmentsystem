@@ -72,6 +72,8 @@ jobs:
             -Dsonar.java.binaries=target/classes
             -Dsonar.java.libraries=target/dependency/*.jar
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            # ✅ استثناء كل الملفات غير المهمة من الكفرج
+            -Dsonar.coverage.exclusions=**/src/test/java/**,**/doc/**,**/doc/**/*.java,**/presentation/**,**/presentation/**/*.java,**/GenerateHash.java
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
