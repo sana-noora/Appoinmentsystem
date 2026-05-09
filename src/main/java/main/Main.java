@@ -483,7 +483,7 @@ public class Main {
         }
     }
 
-    // ── VISITOR 1: Book ─────────────────────────────────────────────
+ // ── VISITOR 1: Book ─────────────────────────────────────────────
     private static void visitorBook(User visitor, AppointmentDAO apptDAO,
                                     TimeSlotDAO slotDAO, ScheduleDAO schedDAO)
             throws SQLException {
@@ -500,7 +500,8 @@ public class Main {
         List<TimeSlot> avail = slotDAO.getAvailableSlotsByScheduleId(chosen.getId());
         if (avail.isEmpty()) {
             System.out.println("  No available slots on that day.\n");
-            logger.info("Visitor " + visitor.getUsername() + ": No available slots on " + chosen.getWorkDate());
+            logger.info("Visitor " + visitor.getUsername()
+                    + ": No available slots on " + chosen.getWorkDate());
             return;
         }
 
@@ -521,53 +522,14 @@ public class Main {
             return;
         }
 
+        BookingTypeResult result = resolveBookingType(visitor);
+        if (result == null) return;
+
         OffsetDateTime start = slot.getStartTime();
         OffsetDateTime end   = start.plusMinutes(dur);
 
-        System.out.println("  Appointment type: 1=Individual  2=Group");
-        System.out.print("  Choice: ");
-        String cat = sc.nextLine().trim();
-
-        String apptType;
-        int participants, maxP;
-
-        if ("1".equals(cat)) {
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            apptType = resolveVisitType("1", sc.nextLine().trim());
-            if (apptType == null) {
-                System.out.println("  Invalid type.\n");
-                logger.warning("Visitor " + visitor.getUsername() + ": Invalid individual visit type");
-                return;
-            }
-            participants = 1; maxP = 1;
-
-        } else if ("2".equals(cat)) {
-            System.out.print("  Number of participants (1-" + MAX_GROUP + "): ");
-            participants = readInt(1, MAX_GROUP);
-            if (participants == -1) {
-                System.out.println("  ✗ Group cannot exceed 5 participants.\n");
-                logger.warning("Visitor " + visitor.getUsername() + ": Invalid group participant count");
-                return;
-            }
-            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
-            System.out.print("  Choice: ");
-            apptType = resolveVisitType("2", sc.nextLine().trim());
-            if (apptType == null) {
-                System.out.println("  Invalid type.\n");
-                logger.warning("Visitor " + visitor.getUsername() + ": Invalid group visit type");
-                return;
-            }
-            maxP = MAX_GROUP;
-
-        } else {
-            System.out.println("  Invalid category.\n");
-            logger.warning("Visitor " + visitor.getUsername() + ": Invalid appointment category");
-            return;
-        }
-
-        Appointment a = new Appointment(apptType, Appointment.STATUS_CONFIRMED,
-                start, end, participants, maxP,
+        Appointment a = new Appointment(result.apptType, Appointment.STATUS_CONFIRMED,
+                start, end, result.participants, result.maxP,
                 Long.parseLong(visitor.getId()), slot.getId());
         apptDAO.addAppointment(a);
         slotDAO.updateAvailability(slot.getId(), false);
@@ -576,8 +538,9 @@ public class Main {
         System.out.println("     Date     : " + chosen.getWorkDate().format(DISPLAY_DATE));
         System.out.println("     Start    : " + fmtTime(start));
         System.out.println("     Duration : " + dur + " minutes");
-        System.out.println("     Type     : " + friendlyType(apptType));
-        if (participants > 1) System.out.println("     Visitors : " + participants);
+        System.out.println("     Type     : " + friendlyType(result.apptType));
+        if (result.participants > 1)
+            System.out.println("     Visitors : " + result.participants);
         System.out.println();
         System.out.println("  ℹ  You can freely modify or cancel this appointment");
         System.out.println("     if more than 24 hours remain.");
@@ -585,7 +548,68 @@ public class Main {
         System.out.println("     • Modification fee if < 24h: 100 NIS");
         System.out.println();
         logger.info("Visitor " + visitor.getUsername() + " booked appointment: "
-                + apptType + " for " + dur + " minutes");
+                + result.apptType + " for " + dur + " minutes");
+    }
+
+    /** Simple container for booking type resolution result. */
+    private static class BookingTypeResult {
+        final String apptType;
+        final int    participants;
+        final int    maxP;
+
+        BookingTypeResult(String apptType, int participants, int maxP) {
+            this.apptType     = apptType;
+            this.participants = participants;
+            this.maxP         = maxP;
+        }
+    }
+
+    /**
+     * Asks the visitor to choose Individual or Group, then the visit sub-type.
+     * Returns null if any input is invalid.
+     */
+    private static BookingTypeResult resolveBookingType(User visitor) {
+        System.out.println("  Appointment type: 1=Individual  2=Group");
+        System.out.print("  Choice: ");
+        String cat = sc.nextLine().trim();
+
+        if ("1".equals(cat)) {
+            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
+            System.out.print("  Choice: ");
+            String apptType = resolveVisitType("1", sc.nextLine().trim());
+            if (apptType == null) {
+                System.out.println("  Invalid type.\n");
+                logger.warning("Visitor " + visitor.getUsername()
+                        + ": Invalid individual visit type");
+                return null;
+            }
+            return new BookingTypeResult(apptType, 1, 1);
+        }
+
+        if ("2".equals(cat)) {
+            System.out.print("  Number of participants (1-" + MAX_GROUP + "): ");
+            int participants = readInt(1, MAX_GROUP);
+            if (participants == -1) {
+                System.out.println("  ✗ Group cannot exceed 5 participants.\n");
+                logger.warning("Visitor " + visitor.getUsername()
+                        + ": Invalid group participant count");
+                return null;
+            }
+            System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
+            System.out.print("  Choice: ");
+            String apptType = resolveVisitType("2", sc.nextLine().trim());
+            if (apptType == null) {
+                System.out.println("  Invalid type.\n");
+                logger.warning("Visitor " + visitor.getUsername()
+                        + ": Invalid group visit type");
+                return null;
+            }
+            return new BookingTypeResult(apptType, participants, MAX_GROUP);
+        }
+
+        System.out.println("  Invalid category.\n");
+        logger.warning("Visitor " + visitor.getUsername() + ": Invalid appointment category");
+        return null;
     }
 
     // ── VISITOR 2: My appointments ───────────────────────────────────
