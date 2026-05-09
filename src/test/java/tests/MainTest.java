@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.io.*;
-import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.time.*;
 import java.util.*;
@@ -28,7 +27,8 @@ import persistence.*;
  * - Edge cases and error handling
  * - SonarCloud compliance (logging, encapsulation, null handling)
  *
- * Uses System.setIn() for input injection instead of reflection to avoid IllegalAccessException.
+ * NOTE: All tests use System.setIn() with ByteArrayInputStream to feed input
+ * to the static Scanner. No reflection is used to modify Scanner fields.
  */
 class MainTest {
 
@@ -113,14 +113,16 @@ class MainTest {
      * Invokes a private method on Main class using reflection.
      */
     private Object call(String method, Class<?>[] types, Object... args) throws Exception {
-        Method m = main.Main.class.getDeclaredMethod(method, types);
+        java.lang.reflect.Method m = main.Main.class.getDeclaredMethod(method, types);
         m.setAccessible(true);
         return m.invoke(null, args);
     }
 
     /**
-     * Feeds input to Scanner by replacing System.in.
-     * This is the safe, non-reflection approach that avoids IllegalAccessException.
+     * Feeds input to System.in via ByteArrayInputStream.
+     * This method replaces System.in so that Scanner reads from the provided string.
+     * 
+     * @param input the input string to feed (lines separated by \n)
      */
     private void feedInput(String input) {
         System.setIn(new ByteArrayInputStream(input.getBytes()));
@@ -573,6 +575,7 @@ class MainTest {
     @DisplayName("adminViewAppointments should show message when no work days exist")
     void testAdminView_noWorkDays() throws Exception {
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_ADMIN_VIEW, VIEW_APPT_TYPES, apptDAO, schedDAO, userDAO);
         assertTrue(output().contains("No work days in system"));
     }
@@ -633,6 +636,7 @@ class MainTest {
     @DisplayName("adminCancelAppointment should show message when no future work days exist")
     void testAdminCancel_noWorkDays() throws Exception {
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_ADMIN_CANCEL, CANCEL_TYPES, apptDAO, slotDAO, schedDAO, userDAO);
         assertTrue(output().contains("No future work days"));
     }
@@ -726,6 +730,7 @@ class MainTest {
     @DisplayName("adminEditAppointment should show message when no future work days exist")
     void testAdminEdit_noWorkDays() throws Exception {
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_ADMIN_EDIT, EDIT_TYPES, apptDAO, schedDAO, userDAO);
         assertTrue(output().contains("No future work days"));
     }
@@ -941,6 +946,7 @@ class MainTest {
     @DisplayName("adminViewDaySlots should show message when no work days exist")
     void testSlots_noWorkDays() throws Exception {
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_ADMIN_SLOTS, SLOTS_TYPES, slotDAO, schedDAO);
         assertTrue(output().contains("No work days"));
     }
@@ -1004,6 +1010,7 @@ class MainTest {
     @DisplayName("adminAddSlot should show message when no work days exist")
     void testAddSlot_noWorkDays() throws Exception {
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_ADMIN_ADD_SLOT, ADD_SLOT_TYPES, slotDAO, schedDAO);
         assertTrue(output().contains("No work days"));
     }
@@ -1054,7 +1061,7 @@ class MainTest {
     }
 
     // ================================================================
-    //  ADMIN TESTS: Add User (NEW)
+    //  ADMIN TESTS: Add User
     // ================================================================
 
     private static final Class<?>[] ADD_USER_TYPES = {UserDAO.class};
@@ -1078,7 +1085,7 @@ class MainTest {
     }
 
     // ================================================================
-    //  ADMIN TESTS: View All Users (IMPROVED)
+    //  ADMIN TESTS: View All Users
     // ================================================================
 
     private static final Class<?>[] VIEW_USERS_TYPES = {UserDAO.class};
@@ -1087,6 +1094,7 @@ class MainTest {
     @DisplayName("adminViewAllUsers should display empty list message")
     void testViewUsers_empty() throws Exception {
         when(userDAO.getAllUsers()).thenReturn(Collections.emptyList());
+        feedInput("");
         call("adminViewAllUsers", VIEW_USERS_TYPES, userDAO);
         assertTrue(output().contains("All Users"));
     }
@@ -1101,6 +1109,7 @@ class MainTest {
         when(u.getPhoneNumber()).thenReturn("0501234567");
         when(u.getRole()).thenReturn(User.Role.VISITOR);
         when(userDAO.getAllUsers()).thenReturn(Collections.singletonList(u));
+        feedInput("");
         call("adminViewAllUsers", VIEW_USERS_TYPES, userDAO);
         assertTrue(output().contains("Test User"));
         assertTrue(output().contains("test@test.com"));
@@ -1117,6 +1126,7 @@ class MainTest {
         when(u.getPhoneNumber()).thenReturn("0509999999");
         when(u.getRole()).thenReturn(User.Role.ADMIN);
         when(userDAO.getAllUsers()).thenReturn(Collections.singletonList(u));
+        feedInput("");
         call("adminViewAllUsers", VIEW_USERS_TYPES, userDAO);
         assertTrue(output().contains("Admin Name"));
         assertTrue(output().contains("ADMIN"));
@@ -1134,6 +1144,7 @@ class MainTest {
     void testBook_noWorkDays() throws Exception {
         User v = mockVisitor();
         when(schedDAO.getFutureSchedules()).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_VIS_BOOK, BOOK_TYPES, v, apptDAO, slotDAO, schedDAO);
         assertTrue(output().contains("No available work days"));
     }
@@ -1297,6 +1308,7 @@ class MainTest {
     void testMyAppts_empty() throws Exception {
         User v = mockVisitor();
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("You have no appointments"));
     }
@@ -1309,6 +1321,7 @@ class MainTest {
         when(a.getStatus()).thenReturn(Appointment.STATUS_CANCELED);
         when(a.isCanceledByAdmin()).thenReturn(false);
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("You have no appointments"));
     }
@@ -1328,6 +1341,7 @@ class MainTest {
         when(a.isGroup()).thenReturn(false);
         when(a.getAdminNote()).thenReturn(null);
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("[DONE]"));
     }
@@ -1347,6 +1361,7 @@ class MainTest {
         when(a.isGroup()).thenReturn(false);
         when(a.getAdminNote()).thenReturn("Admin note here");
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("CANCELED by Admin"));
         assertTrue(output().contains("Admin note here"));
@@ -1362,6 +1377,7 @@ class MainTest {
         when(a.isGroup()).thenReturn(false);
         when(a.getAdminNote()).thenReturn(null);
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("Less than 24h remaining"));
     }
@@ -1376,6 +1392,7 @@ class MainTest {
         when(a.isGroup()).thenReturn(false);
         when(a.getAdminNote()).thenReturn(null);
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("[Upcoming]"));
     }
@@ -1392,6 +1409,7 @@ class MainTest {
         when(a.getAdminNote()).thenReturn(null);
         when(a.getEndTime()).thenReturn(t.plusMinutes(45));
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.singletonList(a));
+        feedInput("");
         call(M_VIS_MINE, MY_APPT_TYPES, v, apptDAO);
         assertTrue(output().contains("visitors: 3"));
     }
@@ -1407,6 +1425,7 @@ class MainTest {
     void testVisEdit_noFuture() throws Exception {
         User v = mockVisitor();
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_VIS_EDIT, EDIT_VIS_TYPES, v, apptDAO);
         assertTrue(output().contains("No future appointments to edit"));
     }
@@ -1561,6 +1580,7 @@ class MainTest {
     void testVisCancel_noFuture() throws Exception {
         User v = mockVisitor();
         when(apptDAO.getAppointmentsByUser(LONG_UID)).thenReturn(Collections.emptyList());
+        feedInput("");
         call(M_VIS_CANCEL, CANCEL_VIS_TYPES, v, apptDAO, slotDAO);
         assertTrue(output().contains("No future appointments to cancel"));
     }
