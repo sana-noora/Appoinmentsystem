@@ -28,9 +28,16 @@
     **/presentaion/**
      </sonar.coverage.exclusions>
 
+<sonar.exclusions>
+    **/doc/**,
+    **/docs/**,
+    **/target/site/**
+</sonar.exclusions>
+
         <sonar.coverage.jacoco.xmlReportPaths>
             target/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
+        
     </properties>
 
     <dependencies>
