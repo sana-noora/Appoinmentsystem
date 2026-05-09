@@ -24,17 +24,23 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String OWNER_EMAIL = "nooraqaradeh3@gmail.com";
     private static final int    MAX_GROUP   = 5;
-    
-    private static final Scanner sc = new Scanner(System.in);
+
+    // ── Scanner is non-final so tests can replace it ──────────────────
+    private static Scanner sc = new Scanner(System.in);
 
     /**
-     * Provides public access to the Scanner for testing and internal purposes.
-     * The Scanner instance itself is immutable; this method only exposes access to it.
-     * 
-     * @return the static Scanner instance bound to System.in
+     * Returns the current Scanner instance (used internally and by tests).
      */
     public static Scanner getScanner() {
         return sc;
+    }
+
+    /**
+     * Replaces the Scanner instance. Call this in tests BEFORE invoking any
+     * Main method so that all sc.nextLine() calls read from the test's input.
+     */
+    public static void setScanner(Scanner scanner) {
+        sc = scanner;
     }
 
     private static final DateTimeFormatter DISPLAY_DT =
@@ -170,9 +176,9 @@ public class Main {
         }
 
         System.out.println("\n  ── Appointments on " + chosen.getWorkDate().format(DISPLAY_DATE)
-                + " ──────────────────────────────────��──");
+                + " ──────────────────────────────────────");
         logger.info("Admin viewing appointments for: " + chosen.getWorkDate());
-        
+
         for (Appointment a : appts) {
             long dur = Duration.between(a.getStartTime(), a.getEndTime()).toMinutes();
             Optional<User> u = userDAO.getUserById(String.valueOf(a.getCreatedBy()));
@@ -217,7 +223,8 @@ public class Main {
             slotDAO.updateAvailability(appt.getSlotId(), true);
 
         System.out.println("  ✓ Appointment canceled. Slot is now free.\n");
-        logger.info("Admin cancelled appointment ID: " + appt.getId() + " - Note: " + (note.isEmpty() ? "none" : note));
+        logger.info("Admin cancelled appointment ID: " + appt.getId()
+                + " - Note: " + (note.isEmpty() ? "none" : note));
     }
 
     // ── ADMIN 3: Edit appointment ────────────────────────────────────
@@ -282,7 +289,9 @@ public class Main {
             apptDAO.updateParticipantsAndNote(appt.getId(), newCount, note);
 
         System.out.println("  ✓ Appointment updated.\n");
-        logger.info("Admin updated appointment ID: " + appt.getId() + " - Type: " + (newType != null ? newType : "unchanged") + ", Count: " + (newCount > 0 ? newCount : "unchanged"));
+        logger.info("Admin updated appointment ID: " + appt.getId()
+                + " - Type: " + (newType != null ? newType : "unchanged")
+                + ", Count: " + (newCount > 0 ? newCount : "unchanged"));
     }
 
     // ── ADMIN 4: Add work day ────────────────────────────────────────
@@ -343,7 +352,7 @@ public class Main {
         System.out.println("\n  ── Slots for " + chosen.getWorkDate().format(DISPLAY_DATE)
                 + " ─────────────────────────────────────");
         logger.info("Admin viewing slots for: " + chosen.getWorkDate());
-        
+
         for (TimeSlot s : slots) {
             String status;
             if (s.isAvailable()) {
@@ -565,7 +574,8 @@ public class Main {
         System.out.println("     • Cancellation fee if < 24h: 200 NIS");
         System.out.println("     • Modification fee if < 24h: 100 NIS");
         System.out.println();
-        logger.info("Visitor " + visitor.getUsername() + " booked appointment: " + apptType + " for " + dur + " minutes");
+        logger.info("Visitor " + visitor.getUsername() + " booked appointment: "
+                + apptType + " for " + dur + " minutes");
     }
 
     // ── VISITOR 2: My appointments ───────────────────────────────────
@@ -647,13 +657,15 @@ public class Main {
                 .filter(a -> a.getId() == apptId).findFirst().orElse(null);
         if (appt == null) {
             System.out.println("  Appointment not found or not yours.\n");
-            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to edit non-existent appointment");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Attempted to edit non-existent appointment");
             return;
         }
 
         if (isWithin24h(appt.getStartTime())) {
             printWithin24hWarning("edit");
-            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to edit appointment within 24h");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Attempted to edit appointment within 24h");
             return;
         }
 
@@ -671,7 +683,8 @@ public class Main {
         } else if ("2".equals(ch)) {
             if (!appt.isGroup()) {
                 System.out.println("  Only Group appointments can change visitor count.\n");
-                logger.warning("Visitor " + visitor.getUsername() + ": Attempted to change count on non-group appointment");
+                logger.warning("Visitor " + visitor.getUsername()
+                        + ": Attempted to change count on non-group appointment");
                 return;
             }
             System.out.print("  New visitor count (1-" + MAX_GROUP + "): ");
@@ -706,13 +719,15 @@ public class Main {
                 .filter(a -> a.getId() == apptId).findFirst().orElse(null);
         if (appt == null) {
             System.out.println("  Appointment not found or not yours.\n");
-            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to cancel non-existent appointment");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Attempted to cancel non-existent appointment");
             return;
         }
 
         if (isWithin24h(appt.getStartTime())) {
             printWithin24hWarning("cancel");
-            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to cancel appointment within 24h");
+            logger.warning("Visitor " + visitor.getUsername()
+                    + ": Attempted to cancel appointment within 24h");
             return;
         }
 
@@ -735,7 +750,6 @@ public class Main {
     //  SHARED PRIVATE HELPERS
     // ================================================================
 
-    /** Picks a schedule from list. Returns null on invalid input. */
     private static Schedule pickSchedule(List<Schedule> days, String header, String prompt) {
         System.out.println("\n  ── " + header + " ─────────────────────────────────────");
         for (int i = 0; i < days.size(); i++)
@@ -745,7 +759,6 @@ public class Main {
         return idx == -1 ? null : days.get(idx - 1);
     }
 
-    /** Prints list, reads ID, validates appointment. Returns null on failure. */
     private static Appointment pickAdminAppt(List<Appointment> appts,
                                               AppointmentDAO apptDAO,
                                               UserDAO userDAO,
@@ -763,10 +776,6 @@ public class Main {
         return appt;
     }
 
-    /**
-     * Asks category (Individual/Group) + visit type, returns resolved type string.
-     * Returns null and prints error if input is invalid.
-     */
     private static String askAppointmentType(String categoryPrompt) {
         System.out.println(categoryPrompt);
         System.out.print("  Choice: ");
@@ -782,12 +791,6 @@ public class Main {
         return type;
     }
 
-    /**
-     * Resolves appointment type from category + visit type.
-     * cat: "1"=Individual, "2"=Group
-     * vt:  "1"=First Visit, "2"=Follow-up, "3"=Virtual
-     * Returns null if either is unrecognized.
-     */
     private static String resolveVisitType(String cat, String vt) {
         if ("1".equals(cat)) {
             switch (vt) {
@@ -807,7 +810,6 @@ public class Main {
         return null;
     }
 
-    /** Returns the visitor's future confirmed appointments. */
     private static List<Appointment> getVisitorFutureAppts(User visitor,
                                                             AppointmentDAO apptDAO)
             throws SQLException {
@@ -818,7 +820,6 @@ public class Main {
                 .collect(Collectors.toList());
     }
 
-    /** Prints future appointment list for visitor edit/cancel. */
     private static void printVisitorApptList(List<Appointment> appts) {
         System.out.println("\n  ── Future Appointments ───────────────────────────────");
         for (Appointment a : appts) {
@@ -830,7 +831,6 @@ public class Main {
         System.out.println();
     }
 
-    /** Prints within-24h warning for visitor edit/cancel. */
     private static void printWithin24hWarning(String verb) {
         System.out.println();
         System.out.println("  ✗ You cannot " + verb + " this appointment because it is less than");
