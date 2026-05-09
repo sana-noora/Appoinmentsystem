@@ -4,6 +4,8 @@ import connectDB.connectDB;
 import domain.*;
 import persistence.*;
 
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.*;
@@ -16,10 +18,18 @@ import java.util.Scanner;
 import java.util.stream.Collectors;
 import service.ReminderService;
 
+
 public class Main {
 
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String OWNER_EMAIL = "nooraqaradeh3@gmail.com";
     private static final int    MAX_GROUP   = 5;
+    
+    private static final Scanner sc = new Scanner(System.in);
+
+    public static Scanner getScanner() {
+        return sc;
+    }
 
     private static final DateTimeFormatter DISPLAY_DT =
             DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy  HH:mm", Locale.ENGLISH);
@@ -28,8 +38,6 @@ public class Main {
     private static final DateTimeFormatter INPUT_DATE =
             DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH);
 
-    public static Scanner sc = new Scanner(System.in);
-
     // ================================================================
     //  MAIN
     // ================================================================
@@ -37,7 +45,7 @@ public class Main {
         while (true) {
             printBanner();
             try (Connection conn = connectDB.getConnection()) {
-                System.out.println("[OK] Connected to database.\n");
+                logger.info("[OK] Connected to database.");
 
                 AppointmentDAO apptDAO  = new AppointmentDAO(conn);
                 TimeSlotDAO    slotDAO  = new TimeSlotDAO(conn);
@@ -48,10 +56,14 @@ public class Main {
                 new ReminderService(apptDAO, userDAO).sendReminders();
 
                 User user = loginLoop(userDAO);
-                if (user == null) { System.out.println("Too many failed attempts. Exiting."); return; }
+                if (user == null) {
+                    logger.warning("Too many failed login attempts. Exiting.");
+                    return;
+                }
 
                 System.out.println("\nWelcome, " + user.getName() + "  [" +
                         (user.getRole() == User.Role.ADMIN ? "Admin" : "Visitor") + "]\n");
+                logger.info("User logged in: " + user.getUsername() + " [" + user.getRole() + "]");
 
                 if (user.getRole() == User.Role.ADMIN) {
                     Admin admin = new Admin(user.getId(), user.getName(), user.getEmail(),
@@ -65,8 +77,7 @@ public class Main {
                 }
 
             } catch (SQLException e) {
-                System.err.println("[ERROR] " + e.getMessage());
-                e.printStackTrace();
+                logger.log(Level.SEVERE, "Database error during connection", e);
             }
         }
     }
@@ -76,10 +87,16 @@ public class Main {
     // ================================================================
     private static User loginLoop(UserDAO userDAO) throws SQLException {
         for (int i = 1; i <= 3; i++) {
-            System.out.print("Username : "); String u = sc.nextLine().trim();
-            System.out.print("Password : "); String p = sc.nextLine().trim();
+            System.out.print("Username : ");
+            String u = sc.nextLine().trim();
+            System.out.print("Password : ");
+            String p = sc.nextLine().trim();
             Optional<User> opt = userDAO.login(u, p);
-            if (opt.isPresent()) return opt.get();
+            if (opt.isPresent()) {
+                logger.info("Login successful for user: " + u);
+                return opt.get();
+            }
+            logger.warning("Invalid login attempt " + i + "/3 for user: " + u);
             System.out.println("  ✗ Invalid credentials. Attempt " + i + "/3.\n");
         }
         return null;
@@ -116,8 +133,11 @@ public class Main {
                 case "6": adminAddSlot(slotDAO, schedDAO);                             break;
                 case "7": adminAddUser(userDAO);                                       break;
                 case "8": adminViewAllUsers(userDAO);                                  break;
-                case "9": admin.logout(); System.out.println("Logged out.\n");         break;
+                case "9": admin.logout(); System.out.println("Logged out.\n");
+                    logger.info("Admin logged out: " + admin.getUsername());
+                    break;
                 default:  System.out.println("  Invalid option.\n");
+                    logger.warning("Invalid menu option selected in admin menu");
             }
         }
     }
@@ -127,7 +147,11 @@ public class Main {
                                               ScheduleDAO schedDAO,
                                               UserDAO userDAO) throws SQLException {
         List<Schedule> all = schedDAO.getFutureSchedules();
-        if (all.isEmpty()) { System.out.println("  No work days in system.\n"); return; }
+        if (all.isEmpty()) {
+            System.out.println("  No work days in system.\n");
+            logger.info("Admin: No work days available");
+            return;
+        }
 
         Schedule chosen = pickSchedule(all, "Work Days", "Choose day (number): ");
         if (chosen == null) return;
@@ -135,11 +159,14 @@ public class Main {
         List<Appointment> appts = apptDAO.getActiveAppointmentsByDate(chosen.getWorkDate());
         if (appts.isEmpty()) {
             System.out.println("  No active appointments on " + chosen.getWorkDate() + ".\n");
+            logger.info("Admin: No appointments on " + chosen.getWorkDate());
             return;
         }
 
         System.out.println("\n  ── Appointments on " + chosen.getWorkDate().format(DISPLAY_DATE)
                 + " ─────────────────────────────────────");
+        logger.info("Admin viewing appointments for: " + chosen.getWorkDate());
+        
         for (Appointment a : appts) {
             long dur = Duration.between(a.getStartTime(), a.getEndTime()).toMinutes();
             Optional<User> u = userDAO.getUserById(String.valueOf(a.getCreatedBy()));
@@ -157,13 +184,21 @@ public class Main {
                                                ScheduleDAO schedDAO,
                                                UserDAO userDAO) throws SQLException {
         List<Schedule> days = schedDAO.getFutureSchedules();
-        if (days.isEmpty()) { System.out.println("  No future work days.\n"); return; }
+        if (days.isEmpty()) {
+            System.out.println("  No future work days.\n");
+            logger.info("Admin: No future work days for cancellation");
+            return;
+        }
 
         Schedule chosen = pickSchedule(days, "Future Work Days", "Choose day (number): ");
         if (chosen == null) return;
 
         List<Appointment> appts = apptDAO.getFutureAppointmentsByDate(chosen.getWorkDate());
-        if (appts.isEmpty()) { System.out.println("  No future appointments on that day.\n"); return; }
+        if (appts.isEmpty()) {
+            System.out.println("  No future appointments on that day.\n");
+            logger.info("Admin: No future appointments on " + chosen.getWorkDate());
+            return;
+        }
 
         Appointment appt = pickAdminAppt(appts, apptDAO, userDAO, "Appointment ID to cancel: ");
         if (appt == null) return;
@@ -176,6 +211,7 @@ public class Main {
             slotDAO.updateAvailability(appt.getSlotId(), true);
 
         System.out.println("  ✓ Appointment canceled. Slot is now free.\n");
+        logger.info("Admin cancelled appointment ID: " + appt.getId() + " - Note: " + (note.isEmpty() ? "none" : note));
     }
 
     // ── ADMIN 3: Edit appointment ────────────────────────────────────
@@ -183,13 +219,21 @@ public class Main {
                                              ScheduleDAO schedDAO,
                                              UserDAO userDAO) throws SQLException {
         List<Schedule> days = schedDAO.getFutureSchedules();
-        if (days.isEmpty()) { System.out.println("  No future work days.\n"); return; }
+        if (days.isEmpty()) {
+            System.out.println("  No future work days.\n");
+            logger.info("Admin: No future work days for editing");
+            return;
+        }
 
         Schedule chosen = pickSchedule(days, "Future Work Days", "Choose day (number): ");
         if (chosen == null) return;
 
         List<Appointment> appts = apptDAO.getFutureAppointmentsByDate(chosen.getWorkDate());
-        if (appts.isEmpty()) { System.out.println("  No future appointments on that day.\n"); return; }
+        if (appts.isEmpty()) {
+            System.out.println("  No future appointments on that day.\n");
+            logger.info("Admin: No future appointments on " + chosen.getWorkDate() + " for editing");
+            return;
+        }
 
         Appointment appt = pickAdminAppt(appts, apptDAO, userDAO, "Appointment ID to edit: ");
         if (appt == null) return;
@@ -209,12 +253,17 @@ public class Main {
 
         } else if ("2".equals(ch)) {
             if (!appt.isGroup()) {
-                System.out.println("  Participant count is only for Group appointments.\n"); return;
+                System.out.println("  Participant count is only for Group appointments.\n");
+                logger.warning("Admin attempted to change participant count on non-group appointment");
+                return;
             }
             System.out.print("  New participant count (1-" + MAX_GROUP + "): ");
-            newCount = readInt(1, MAX_GROUP); if (newCount == -1) return;
+            newCount = readInt(1, MAX_GROUP);
+            if (newCount == -1) return;
         } else {
-            System.out.println("  Invalid choice.\n"); return;
+            System.out.println("  Invalid choice.\n");
+            logger.warning("Invalid edit choice in admin edit appointment");
+            return;
         }
 
         System.out.print("  Note / reason for user: ");
@@ -227,13 +276,14 @@ public class Main {
             apptDAO.updateParticipantsAndNote(appt.getId(), newCount, note);
 
         System.out.println("  ✓ Appointment updated.\n");
+        logger.info("Admin updated appointment ID: " + appt.getId() + " - Type: " + (newType != null ? newType : "unchanged") + ", Count: " + (newCount > 0 ? newCount : "unchanged"));
     }
 
     // ── ADMIN 4: Add work day ────────────────────────────────────────
     private static void adminAddWorkDay(ScheduleDAO schedDAO) throws SQLException {
         List<Schedule> future = schedDAO.getFutureSchedules();
         if (!future.isEmpty()) {
-            System.out.println("\n  ── Current & Future Work Days ────────────────────");
+            System.out.println("\n  ── Current & Future Work Days ──��─────────────────");
             for (Schedule s : future)
                 System.out.println("    " + s.getWorkDate().format(DISPLAY_DATE));
         }
@@ -241,33 +291,53 @@ public class Main {
         System.out.print("\n  New work date (yyyy-MM-dd): ");
         String input = sc.nextLine().trim();
         LocalDate date;
-        try { date = LocalDate.parse(input, INPUT_DATE); }
-        catch (DateTimeParseException e) { System.out.println("  Invalid format.\n"); return; }
+        try {
+            date = LocalDate.parse(input, INPUT_DATE);
+        } catch (DateTimeParseException e) {
+            System.out.println("  Invalid format.\n");
+            logger.warning("Invalid date format provided: " + input);
+            return;
+        }
 
         if (date.isBefore(LocalDate.now())) {
-            System.out.println("  Date must be today or in the future.\n"); return;
+            System.out.println("  Date must be today or in the future.\n");
+            logger.warning("Admin attempted to add past work date: " + date);
+            return;
         }
         if (schedDAO.existsByDate(date)) {
-            System.out.println("  This day already exists. Please choose a different date.\n"); return;
+            System.out.println("  This day already exists. Please choose a different date.\n");
+            logger.warning("Admin attempted to add duplicate work date: " + date);
+            return;
         }
         schedDAO.addSchedule(new Schedule(date));
         System.out.println("  ✓ Work day added successfully.\n");
+        logger.info("Admin added new work day: " + date);
     }
 
     // ── ADMIN 5: View day slots ──────────────────────────────────────
     private static void adminViewDaySlots(TimeSlotDAO slotDAO,
                                           ScheduleDAO schedDAO) throws SQLException {
         List<Schedule> future = schedDAO.getFutureSchedules();
-        if (future.isEmpty()) { System.out.println("  No work days.\n"); return; }
+        if (future.isEmpty()) {
+            System.out.println("  No work days.\n");
+            logger.info("Admin: No work days available for viewing slots");
+            return;
+        }
 
         Schedule chosen = pickSchedule(future, "Work Days", "Choose day: ");
         if (chosen == null) return;
 
         List<TimeSlot> slots = slotDAO.getAllSlotsBySchedule(chosen.getId());
-        if (slots.isEmpty()) { System.out.println("  No slots for that day.\n"); return; }
+        if (slots.isEmpty()) {
+            System.out.println("  No slots for that day.\n");
+            logger.info("Admin: No slots on " + chosen.getWorkDate());
+            return;
+        }
 
         System.out.println("\n  ── Slots for " + chosen.getWorkDate().format(DISPLAY_DATE)
                 + " ─────────────────────────────────────");
+        logger.info("Admin viewing slots for: " + chosen.getWorkDate());
+        
         for (TimeSlot s : slots) {
             String status;
             if (s.isAvailable()) {
@@ -285,7 +355,11 @@ public class Main {
     private static void adminAddSlot(TimeSlotDAO slotDAO,
                                      ScheduleDAO schedDAO) throws SQLException {
         List<Schedule> future = schedDAO.getFutureSchedules();
-        if (future.isEmpty()) { System.out.println("  No work days.\n"); return; }
+        if (future.isEmpty()) {
+            System.out.println("  No work days.\n");
+            logger.info("Admin: No work days available for adding slot");
+            return;
+        }
 
         Schedule chosen = pickSchedule(future, "Work Days", "Choose day: ");
         if (chosen == null) return;
@@ -298,7 +372,8 @@ public class Main {
         }
 
         System.out.print("  New slot start hour (0-23, whole hours only e.g. 9, 10, 14): ");
-        int hour = readInt(0, 23); if (hour == -1) return;
+        int hour = readInt(0, 23);
+        if (hour == -1) return;
 
         OffsetDateTime start = chosen.getWorkDate().atTime(hour, 0)
                 .atZone(ZoneId.systemDefault()).toOffsetDateTime()
@@ -306,26 +381,35 @@ public class Main {
         OffsetDateTime end = start.plusHours(1);
 
         if (slotDAO.existsByScheduleAndStart(chosen.getId(), start)) {
-            System.out.println("  This slot already exists. Please choose a different time.\n"); return;
+            System.out.println("  This slot already exists. Please choose a different time.\n");
+            logger.warning("Admin attempted to add duplicate slot at " + fmtTime(start));
+            return;
         }
 
         slotDAO.addTimeSlot(new TimeSlot(chosen.getId(), start, end, true));
         System.out.println("  ✓ Slot added: " + fmtTime(start) + "\n");
+        logger.info("Admin added new time slot: " + fmtTime(start));
     }
 
     // ── ADMIN 7: Add user ────────────────────────────────────────────
     private static void adminAddUser(UserDAO userDAO) throws SQLException {
         System.out.println("\n  ── Add New User ──────────────────────────────────────");
-        System.out.print("  Name       : "); String name = sc.nextLine().trim();
-        System.out.print("  Email      : "); String mail = sc.nextLine().trim();
-        System.out.print("  Phone      : "); String ph   = sc.nextLine().trim();
-        System.out.print("  Username   : "); String un   = sc.nextLine().trim();
-        System.out.print("  Password   : "); String pw   = sc.nextLine().trim();
+        System.out.print("  Name       : ");
+        String name = sc.nextLine().trim();
+        System.out.print("  Email      : ");
+        String mail = sc.nextLine().trim();
+        System.out.print("  Phone      : ");
+        String ph   = sc.nextLine().trim();
+        System.out.print("  Username   : ");
+        String un   = sc.nextLine().trim();
+        System.out.print("  Password   : ");
+        String pw   = sc.nextLine().trim();
         System.out.print("  Role (1=Admin, 2=Visitor): ");
         String rc = sc.nextLine().trim();
         User.Role role = "1".equals(rc) ? User.Role.ADMIN : User.Role.VISITOR;
         userDAO.addUser(new User("", name, mail, ph, un, role), pw);
         System.out.println("  ✓ User registered successfully.\n");
+        logger.info("Admin created new user: " + un + " with role: " + role);
     }
 
     // ── ADMIN 8: View all users ──────────────────────────────────────
@@ -339,6 +423,7 @@ public class Main {
             System.out.printf("  %-4s  %-20s  %-30s  %-13s  %-10s%n",
                     u.getId(), u.getName(), u.getEmail(), u.getPhoneNumber(), u.getRole());
         System.out.println();
+        logger.info("Admin viewed all users. Total count: " + users.size());
     }
 
     // ================================================================
@@ -364,8 +449,11 @@ public class Main {
                 case "2": visitorMyAppointments(visitor, apptDAO);                break;
                 case "3": visitorEdit(visitor, apptDAO);                          break;
                 case "4": visitorCancel(visitor, apptDAO, slotDAO);               break;
-                case "5": visitor.logout(); System.out.println("Logged out.\n");  break;
+                case "5": visitor.logout(); System.out.println("Logged out.\n");
+                    logger.info("Visitor logged out: " + visitor.getUsername());
+                    break;
                 default:  System.out.println("  Invalid option.\n");
+                    logger.warning("Invalid menu option selected in visitor menu");
             }
         }
     }
@@ -375,25 +463,38 @@ public class Main {
                                     TimeSlotDAO slotDAO, ScheduleDAO schedDAO)
             throws SQLException {
         List<Schedule> days = schedDAO.getFutureSchedules();
-        if (days.isEmpty()) { System.out.println("  No available work days.\n"); return; }
+        if (days.isEmpty()) {
+            System.out.println("  No available work days.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No available work days");
+            return;
+        }
 
         Schedule chosen = pickSchedule(days, "Future Work Days", "Choose day: ");
         if (chosen == null) return;
 
         List<TimeSlot> avail = slotDAO.getAvailableSlotsByScheduleId(chosen.getId());
-        if (avail.isEmpty()) { System.out.println("  No available slots on that day.\n"); return; }
+        if (avail.isEmpty()) {
+            System.out.println("  No available slots on that day.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No available slots on " + chosen.getWorkDate());
+            return;
+        }
 
         System.out.println("\n  ── Available Slots ───────────────────────────────────");
         for (int i = 0; i < avail.size(); i++)
             System.out.printf("  %d. %s%n", i + 1, fmtTime(avail.get(i).getStartTime()));
 
         System.out.print("  Choose slot: ");
-        int si = readInt(1, avail.size()); if (si == -1) return;
+        int si = readInt(1, avail.size());
+        if (si == -1) return;
         TimeSlot slot = avail.get(si - 1);
 
         System.out.print("  Duration in minutes (max 60): ");
         int dur = readInt(1, 60);
-        if (dur == -1) { System.out.println("  ✗ Duration cannot exceed 60 minutes.\n"); return; }
+        if (dur == -1) {
+            System.out.println("  ✗ Duration cannot exceed 60 minutes.\n");
+            logger.warning("Visitor " + visitor.getUsername() + ": Invalid duration");
+            return;
+        }
 
         OffsetDateTime start = slot.getStartTime();
         OffsetDateTime end   = start.plusMinutes(dur);
@@ -409,23 +510,35 @@ public class Main {
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
             System.out.print("  Choice: ");
             apptType = resolveVisitType("1", sc.nextLine().trim());
-            if (apptType == null) { System.out.println("  Invalid type.\n"); return; }
+            if (apptType == null) {
+                System.out.println("  Invalid type.\n");
+                logger.warning("Visitor " + visitor.getUsername() + ": Invalid individual visit type");
+                return;
+            }
             participants = 1; maxP = 1;
 
         } else if ("2".equals(cat)) {
             System.out.print("  Number of participants (1-" + MAX_GROUP + "): ");
             participants = readInt(1, MAX_GROUP);
             if (participants == -1) {
-                System.out.println("  ✗ Group cannot exceed 5 participants.\n"); return;
+                System.out.println("  ✗ Group cannot exceed 5 participants.\n");
+                logger.warning("Visitor " + visitor.getUsername() + ": Invalid group participant count");
+                return;
             }
             System.out.println("  Visit type: 1=First Visit  2=Follow-up  3=Virtual");
             System.out.print("  Choice: ");
             apptType = resolveVisitType("2", sc.nextLine().trim());
-            if (apptType == null) { System.out.println("  Invalid type.\n"); return; }
+            if (apptType == null) {
+                System.out.println("  Invalid type.\n");
+                logger.warning("Visitor " + visitor.getUsername() + ": Invalid group visit type");
+                return;
+            }
             maxP = MAX_GROUP;
 
         } else {
-            System.out.println("  Invalid category.\n"); return;
+            System.out.println("  Invalid category.\n");
+            logger.warning("Visitor " + visitor.getUsername() + ": Invalid appointment category");
+            return;
         }
 
         Appointment a = new Appointment(apptType, Appointment.STATUS_CONFIRMED,
@@ -446,6 +559,7 @@ public class Main {
         System.out.println("     • Cancellation fee if < 24h: 200 NIS");
         System.out.println("     • Modification fee if < 24h: 100 NIS");
         System.out.println();
+        logger.info("Visitor " + visitor.getUsername() + " booked appointment: " + apptType + " for " + dur + " minutes");
     }
 
     // ── VISITOR 2: My appointments ───────────────────────────────────
@@ -453,14 +567,22 @@ public class Main {
                                               AppointmentDAO apptDAO) throws SQLException {
         long uid = Long.parseLong(visitor.getId());
         List<Appointment> all = apptDAO.getAppointmentsByUser(uid);
-        if (all.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
+        if (all.isEmpty()) {
+            System.out.println("  You have no appointments.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No appointments in system");
+            return;
+        }
 
         List<Appointment> visible = all.stream()
                 .filter(a -> !(Appointment.STATUS_CANCELED.equals(a.getStatus())
                                && !a.isCanceledByAdmin()))
                 .collect(Collectors.toList());
 
-        if (visible.isEmpty()) { System.out.println("  You have no appointments.\n"); return; }
+        if (visible.isEmpty()) {
+            System.out.println("  You have no appointments.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No visible appointments");
+            return;
+        }
 
         visible.sort((a, b) -> {
             int groupA = sortGroup(a), groupB = sortGroup(b);
@@ -490,6 +612,7 @@ public class Main {
                 System.out.println("       📝 Note from Admin: " + a.getAdminNote());
         }
         System.out.println();
+        logger.info("Visitor " + visitor.getUsername() + " viewed appointments. Count: " + visible.size());
     }
 
     private static int sortGroup(Appointment a) {
@@ -502,18 +625,31 @@ public class Main {
     private static void visitorEdit(User visitor,
                                     AppointmentDAO apptDAO) throws SQLException {
         List<Appointment> future = getVisitorFutureAppts(visitor, apptDAO);
-        if (future.isEmpty()) { System.out.println("  No future appointments to edit.\n"); return; }
+        if (future.isEmpty()) {
+            System.out.println("  No future appointments to edit.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No future appointments to edit");
+            return;
+        }
 
         printVisitorApptList(future);
 
         System.out.print("  Appointment ID to edit: ");
-        long apptId = readLong(); if (apptId == -1) return;
+        long apptId = readLong();
+        if (apptId == -1) return;
 
         Appointment appt = future.stream()
                 .filter(a -> a.getId() == apptId).findFirst().orElse(null);
-        if (appt == null) { System.out.println("  Appointment not found or not yours.\n"); return; }
+        if (appt == null) {
+            System.out.println("  Appointment not found or not yours.\n");
+            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to edit non-existent appointment");
+            return;
+        }
 
-        if (isWithin24h(appt.getStartTime())) { printWithin24hWarning("edit"); return; }
+        if (isWithin24h(appt.getStartTime())) {
+            printWithin24hWarning("edit");
+            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to edit appointment within 24h");
+            return;
+        }
 
         System.out.println("  What to change? 1=Appointment type  2=Visitor count (Group only)");
         System.out.print("  Choice: ");
@@ -524,17 +660,23 @@ public class Main {
             if (newType == null) return;
             apptDAO.updateType(apptId, newType);
             System.out.println("  ✓ Type updated.\n");
+            logger.info("Visitor " + visitor.getUsername() + " edited appointment type to: " + newType);
 
         } else if ("2".equals(ch)) {
             if (!appt.isGroup()) {
-                System.out.println("  Only Group appointments can change visitor count.\n"); return;
+                System.out.println("  Only Group appointments can change visitor count.\n");
+                logger.warning("Visitor " + visitor.getUsername() + ": Attempted to change count on non-group appointment");
+                return;
             }
             System.out.print("  New visitor count (1-" + MAX_GROUP + "): ");
-            int cnt = readInt(1, MAX_GROUP); if (cnt == -1) return;
+            int cnt = readInt(1, MAX_GROUP);
+            if (cnt == -1) return;
             apptDAO.updateParticipants(apptId, cnt);
             System.out.println("  ✓ Visitor count updated.\n");
+            logger.info("Visitor " + visitor.getUsername() + " updated participant count to: " + cnt);
         } else {
             System.out.println("  Invalid.\n");
+            logger.warning("Visitor " + visitor.getUsername() + ": Invalid edit choice");
         }
     }
 
@@ -542,22 +684,37 @@ public class Main {
     private static void visitorCancel(User visitor, AppointmentDAO apptDAO,
                                       TimeSlotDAO slotDAO) throws SQLException {
         List<Appointment> future = getVisitorFutureAppts(visitor, apptDAO);
-        if (future.isEmpty()) { System.out.println("  No future appointments to cancel.\n"); return; }
+        if (future.isEmpty()) {
+            System.out.println("  No future appointments to cancel.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": No future appointments to cancel");
+            return;
+        }
 
         printVisitorApptList(future);
 
         System.out.print("  Appointment ID to cancel: ");
-        long apptId = readLong(); if (apptId == -1) return;
+        long apptId = readLong();
+        if (apptId == -1) return;
 
         Appointment appt = future.stream()
                 .filter(a -> a.getId() == apptId).findFirst().orElse(null);
-        if (appt == null) { System.out.println("  Appointment not found or not yours.\n"); return; }
+        if (appt == null) {
+            System.out.println("  Appointment not found or not yours.\n");
+            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to cancel non-existent appointment");
+            return;
+        }
 
-        if (isWithin24h(appt.getStartTime())) { printWithin24hWarning("cancel"); return; }
+        if (isWithin24h(appt.getStartTime())) {
+            printWithin24hWarning("cancel");
+            logger.warning("Visitor " + visitor.getUsername() + ": Attempted to cancel appointment within 24h");
+            return;
+        }
 
         System.out.print("  Confirm cancellation? (yes/no): ");
         if (!"yes".equalsIgnoreCase(sc.nextLine().trim())) {
-            System.out.println("  Aborted.\n"); return;
+            System.out.println("  Aborted.\n");
+            logger.info("Visitor " + visitor.getUsername() + ": Cancellation aborted");
+            return;
         }
 
         apptDAO.updateStatus(apptId, Appointment.STATUS_CANCELED);
@@ -565,6 +722,7 @@ public class Main {
             slotDAO.updateAvailability(appt.getSlotId(), true);
 
         System.out.println("  ✓ Appointment canceled. Slot is now free. No penalty applied.\n");
+        logger.info("Visitor " + visitor.getUsername() + " cancelled appointment ID: " + apptId);
     }
 
     // ================================================================
@@ -593,6 +751,7 @@ public class Main {
         Appointment appt = apptDAO.getAppointmentById(apptId);
         if (appt == null || !appt.getStartTime().isAfter(OffsetDateTime.now())) {
             System.out.println("  Appointment not found or already past.\n");
+            logger.warning("Invalid appointment ID or already past: " + apptId);
             return null;
         }
         return appt;
@@ -610,7 +769,10 @@ public class Main {
         System.out.print("  Choice: ");
         String vt = sc.nextLine().trim();
         String type = resolveVisitType(cat, vt);
-        if (type == null) System.out.println("  Invalid.\n");
+        if (type == null) {
+            System.out.println("  Invalid.\n");
+            logger.warning("Invalid appointment type: category=" + cat + ", visitType=" + vt);
+        }
         return type;
     }
 
@@ -717,15 +879,20 @@ public class Main {
         try {
             int v = Integer.parseInt(sc.nextLine().trim());
             if (v >= min && v <= max) return v;
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException e) {
+            logger.fine("Invalid integer input provided");
+        }
         System.out.println("  Invalid input.\n");
         return -1;
     }
 
     private static long readLong() {
-        try { return Long.parseLong(sc.nextLine().trim()); }
-        catch (NumberFormatException e) {
-            System.out.println("  Invalid ID.\n"); return -1;
+        try {
+            return Long.parseLong(sc.nextLine().trim());
+        } catch (NumberFormatException e) {
+            logger.fine("Invalid long input provided");
+            System.out.println("  Invalid ID.\n");
+            return -1;
         }
     }
 
