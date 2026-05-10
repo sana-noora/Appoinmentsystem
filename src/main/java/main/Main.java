@@ -18,6 +18,11 @@ import java.util.Scanner;
 import java.util.stream.Collectors;
 import service.ReminderService;
 
+import service_rules.BookingRuleEngine;
+import service_rules.DurationRule;
+import service_rules.CapacityRule;
+import java.util.Arrays;
+
 
 public class Main {
 
@@ -532,9 +537,24 @@ public class Main {
         Appointment a = new Appointment(result.apptType, Appointment.STATUS_CONFIRMED,
                 start, end, result.participants, result.maxP,
                 Long.parseLong(visitor.getId()), slot.getId());
+
+        BookingRuleEngine engine = new BookingRuleEngine(
+                Arrays.asList(
+                        new DurationRule(),
+                        new CapacityRule()
+                )
+        );
+
+        try {
+            engine.validate(a);
+        } catch (IllegalArgumentException e) {
+            System.out.println("  ✗ " + e.getMessage() + "\n");
+            logger.warning("Booking rejected: " + e.getMessage());
+            return;
+        }
+
         apptDAO.addAppointment(a);
         slotDAO.updateAvailability(slot.getId(), false);
-
         System.out.println("\n  ✅ Appointment booked successfully!");
         System.out.println("     Date     : " + chosen.getWorkDate().format(DISPLAY_DATE));
         System.out.println("     Start    : " + fmtTime(start));
