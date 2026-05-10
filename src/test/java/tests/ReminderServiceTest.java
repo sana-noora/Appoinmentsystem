@@ -184,12 +184,18 @@ class ReminderServiceTest {
         when(appointmentDAO.getAllAppointments()).thenReturn(Collections.singletonList(a));
         when(userDAO.getUserById("1")).thenReturn(Optional.of(u));
 
-        ReminderService spyService = spy(reminderService);
-        doNothing().when(spyService).sendEmail(any(User.class), any(Appointment.class));
 
-        spyService.sendReminders();
+        service_notify.Observer observer = mock(service_notify.Observer.class);
+         service_notify.Notifier notifier = new service_notify.Notifier();
+         notifier.addObserver(observer);
 
-        verify(spyService).sendEmail(u, a);
+         ReminderService service =
+                 new ReminderService(appointmentDAO, userDAO, notifier);
+
+         service.sendReminders();
+
+         verify(observer).notify(eq(u), anyString());
+
     }
     
     @Test

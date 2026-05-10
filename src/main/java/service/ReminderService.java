@@ -17,10 +17,15 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
 
+import service_notify.Notifier;
+import service_notify.EmailObserver;
+
 public class ReminderService {
 
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final int    SMTP_PORT = 587;
+
+    private final Notifier notifier;
 
     private static final DateTimeFormatter DISPLAY_DT =
             DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy  HH:mm", Locale.ENGLISH);
@@ -31,15 +36,32 @@ public class ReminderService {
     private final AppointmentDAO appointmentDAO;
     private final UserDAO        userDAO;
 
-    public ReminderService(AppointmentDAO appointmentDAO, UserDAO userDAO) {
-        this.appointmentDAO = appointmentDAO;
-        this.userDAO        = userDAO;
 
-        // Load credentials from .env file (placed in project root)
-        Dotenv dotenv = Dotenv.load();
-        this.senderEmail    = dotenv.get("EMAIL_USERNAME");
-        this.senderPassword = dotenv.get("EMAIL_PASSWORD");
-    }
+public ReminderService(AppointmentDAO appointmentDAO, UserDAO userDAO) {
+    this.appointmentDAO = appointmentDAO;
+    this.userDAO        = userDAO;
+
+    Dotenv dotenv = Dotenv.load();
+    this.senderEmail    = dotenv.get("EMAIL_USERNAME");
+    this.senderPassword = dotenv.get("EMAIL_PASSWORD");
+
+    this.notifier = new Notifier();
+    this.notifier.addObserver(new EmailObserver());
+}
+
+public ReminderService(AppointmentDAO appointmentDAO,
+                       UserDAO userDAO,
+                       Notifier notifier) {
+    this.appointmentDAO = appointmentDAO;
+    this.userDAO = userDAO;
+    this.notifier = notifier;
+
+    Dotenv dotenv = Dotenv.load();
+    this.senderEmail = dotenv.get("EMAIL_USERNAME");
+    this.senderPassword = dotenv.get("EMAIL_PASSWORD");
+}
+
+
 
     public void sendReminders() {
         try {
@@ -59,8 +81,11 @@ public class ReminderService {
                     User u = optUser.get();
                     if (u.getEmail() == null || u.getEmail().trim().isEmpty()) continue;
 
-                    sendEmail(u, a);
-                    sent++;
+
+String message = buildBody(u, a);
+notifier.notifyAll(u, message);
+sent++;
+
                 }
             }
 
