@@ -79,9 +79,16 @@ public class Main {
                 logger.info("User logged in: " + user.getUsername() + " [" + user.getRole() + "]");
 
                 if (user.getRole() == User.Role.ADMIN) {
-                    Admin admin = new Admin(user.getId(), user.getName(), user.getEmail(),
-                            user.getPhoneNumber(), user.getUsername(),
-                            apptDAO, slotDAO, schedDAO);
+                    Admin admin = new Admin.Builder()
+                        .setId(user.getId())
+                        .setName(user.getName())
+                        .setEmail(user.getEmail())
+                        .setPhoneNumber(user.getPhoneNumber())
+                        .setUsername(user.getUsername())
+                        .setAppointmentDAO(apptDAO)
+                        .setTimeSlotDAO(slotDAO)
+                        .setScheduleDAO(schedDAO)
+                        .build();
                     admin.markLoggedIn();
                     adminMenu(admin, apptDAO, slotDAO, schedDAO, userDAO);
                 } else {

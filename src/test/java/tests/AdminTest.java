@@ -34,16 +34,16 @@ class AdminTest {
 
     @BeforeEach
     void setUp() {
-        admin = new Admin(
-                "1",
-                "Admin",
-                "admin@test.com",
-                "123456",
-                "adminuser",
-                appointmentDAO,
-                timeSlotDAO,
-                scheduleDAO
-        );
+        admin = new Admin.Builder()
+                .setId("1")
+                .setName("Admin")
+                .setEmail("admin@test.com")
+                .setPhoneNumber("123456")
+                .setUsername("adminuser")
+                .setAppointmentDAO(appointmentDAO)
+                .setTimeSlotDAO(timeSlotDAO)
+                .setScheduleDAO(scheduleDAO)
+                .build();
     }
 
     // -------------------- Work days --------------------

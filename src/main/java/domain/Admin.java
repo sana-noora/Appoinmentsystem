@@ -15,16 +15,45 @@ public class Admin extends User {
     private final TimeSlotDAO timeSlotDAO;
     private final ScheduleDAO scheduleDAO;
 
-    public Admin(String id, String name, String email, String phoneNumber,
-                 String username,
-                 AppointmentDAO appointmentDAO,
-                 TimeSlotDAO timeSlotDAO,
-                 ScheduleDAO scheduleDAO) {
-        super(id, name, email, phoneNumber, username, Role.ADMIN);
-        this.appointmentDAO = appointmentDAO;
-        this.timeSlotDAO    = timeSlotDAO;
-        this.scheduleDAO    = scheduleDAO;
+    private Admin(Builder builder) {
+        super(
+            builder.id,
+            builder.name,
+            builder.email,
+            builder.phoneNumber,
+            builder.username,
+            Role.ADMIN
+        );
+        this.appointmentDAO = builder.appointmentDAO;
+        this.timeSlotDAO    = builder.timeSlotDAO;
+        this.scheduleDAO    = builder.scheduleDAO;
     }
+
+    // ====== Builder Class ======
+    public static class Builder {
+        private String id;
+        private String name;
+        private String email;
+        private String phoneNumber;
+        private String username;
+
+        private AppointmentDAO appointmentDAO;
+        private TimeSlotDAO timeSlotDAO;
+        private ScheduleDAO scheduleDAO;
+
+        public Builder setId(String id) { this.id = id; return this; }
+        public Builder setName(String name) { this.name = name; return this; }
+        public Builder setEmail(String email) { this.email = email; return this; }
+        public Builder setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; return this; }
+        public Builder setUsername(String username) { this.username = username; return this; }
+        public Builder setAppointmentDAO(AppointmentDAO d) { this.appointmentDAO = d; return this; }
+        public Builder setTimeSlotDAO(TimeSlotDAO d) { this.timeSlotDAO = d; return this; }
+        public Builder setScheduleDAO(ScheduleDAO d) { this.scheduleDAO = d; return this; }
+        public Admin build() {
+            return new Admin(this);
+        }
+    }
+    // ====== End Builder =======
 
     public List<Schedule> viewWorkDays() throws SQLException {
         return scheduleDAO.getAllSchedules();
