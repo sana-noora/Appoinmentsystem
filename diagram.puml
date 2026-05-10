@@ -4,6 +4,7 @@ skinparam classAttributeIconSize 0
 skinparam classFontStyle bold
 skinparam ArrowColor #444444
 skinparam ClassBorderColor #555555
+skinparam linetype ortho
 
 ' ══════════════════════════════
 '  ENUMS
@@ -39,7 +40,11 @@ class User {
 }
 
 class Admin {
+  - appointmentDAO: AppointmentDAO
+  - timeSlotDAO: TimeSlotDAO
+  - scheduleDAO: ScheduleDAO
   --
+  - Admin(builder: Builder)
   + viewWorkDays(): List<Schedule>
   + addWorkDay(workDate: LocalDate): long
   + viewAvailableSlots(): List<TimeSlot>
@@ -51,6 +56,27 @@ class Admin {
   + validateDuration(a: Appointment): boolean
   + validateCapacity(a: Appointment): boolean
   + validateType(a: Appointment): boolean
+}
+
+class "Admin.Builder" as AdminBuilder {
+  - id: String
+  - name: String
+  - email: String
+  - phoneNumber: String
+  - username: String
+  - appointmentDAO: AppointmentDAO
+  - timeSlotDAO: TimeSlotDAO
+  - scheduleDAO: ScheduleDAO
+  --
+  + setId(id: String): Builder
+  + setName(name: String): Builder
+  + setEmail(email: String): Builder
+  + setPhoneNumber(phoneNumber: String): Builder
+  + setUsername(username: String): Builder
+  + setAppointmentDAO(d: AppointmentDAO): Builder
+  + setTimeSlotDAO(d: TimeSlotDAO): Builder
+  + setScheduleDAO(d: ScheduleDAO): Builder
+  + build(): Admin
 }
 
 class Appointment {
@@ -127,12 +153,14 @@ class connectDB {
   - {static} USER: String
   - {static} PASS: String
   --
+  - connectDB()
   + {static} getConnection(): Connection
 }
 
 class AppointmentDAO {
   - connection: Connection
   --
+  + markPastAppointmentsDone(): void
   + addAppointment(appointment: Appointment): void
   + getAppointmentById(id: long): Appointment
   + getAllAppointments(): List<Appointment>
@@ -140,6 +168,7 @@ class AppointmentDAO {
   + getFutureAppointmentsByDate(date: LocalDate): List<Appointment>
   + getAppointmentsByUser(userId: long): List<Appointment>
   + updateStatus(id: long, newStatus: String): int
+  + cancelByAdmin(id: long, note: String): int
   + updateStatusAndNote(id: long, newStatus: String, note: String): int
   + updateParticipants(id: long, newCount: int): int
   + updateParticipantsAndNote(id: long, newCount: int, note: String): int
@@ -147,7 +176,6 @@ class AppointmentDAO {
   + updateType(id: long, newType: String): int
   + updateSlotAndTime(id: long, newSlotId: long, newStart: OffsetDateTime, newEnd: OffsetDateTime): int
   + deleteAppointment(id: long): void
-  + markPastAppointmentsDone(): void
 }
 
 class ScheduleDAO {
@@ -198,47 +226,120 @@ class ReminderService {
   - senderPassword: String
   - appointmentDAO: AppointmentDAO
   - userDAO: UserDAO
+  - notifier: Notifier
   --
+  + ReminderService(appointmentDAO: AppointmentDAO, userDAO: UserDAO)
+  + ReminderService(appointmentDAO: AppointmentDAO, userDAO: UserDAO, notifier: Notifier)
   + sendReminders(): void
-  - sendEmail(user: User, appointment: Appointment): void
+  + sendEmail(user: User, appointment: Appointment): void
+  + friendlyType(t: String): String
   - buildBody(user: User, appointment: Appointment): String
-  - friendlyType(t: String): String
+}
+
+' ══════════════════════════════
+'  OBSERVER PATTERN
+'  (service_notify package)
+' ══════════════════════════════
+
+interface Observer {
+  + notify(user: User, message: String): void
+}
+
+class Notifier {
+  - observers: List<Observer>
+  --
+  + addObserver(observer: Observer): void
+  + notifyAll(user: User, message: String): void
+}
+
+class EmailObserver {
+  --
+  + notify(user: User, message: String): void
+}
+
+' ══════════════════════════════
+'  STRATEGY PATTERN
+'  (service_rules package)
+' ══════════════════════════════
+
+interface BookingRuleStrategy {
+  + isValid(appointment: Appointment): boolean
+  + errorMessage(): String
+}
+
+class BookingRuleEngine {
+  - rules: List<BookingRuleStrategy>
+  --
+  + BookingRuleEngine(rules: List<BookingRuleStrategy>)
+  + validate(appointment: Appointment): void
+}
+
+class CapacityRule {
+  --
+  + isValid(appointment: Appointment): boolean
+  + errorMessage(): String
+}
+
+class DurationRule {
+  - {static} MAX_MINUTES: long
+  --
+  + isValid(appointment: Appointment): boolean
+  + errorMessage(): String
 }
 
 ' ══════════════════════════════
 '  RELATIONSHIPS
 ' ══════════════════════════════
 
-' Inheritance (Admin extends User)
+' ── Inheritance ────────────────
 User <|-- Admin
 
-' User has a Role (composition-like enum association)
+' ── Builder (nested, creates Admin) ────
+AdminBuilder ..> Admin       : <<creates>>
+Admin        +-- AdminBuilder
+
+' ── Enum association ───────────
 User --> Role
 
-' Admin uses DAOs (composition — injected via constructor)
-Admin *-- AppointmentDAO
-Admin *-- TimeSlotDAO
-Admin *-- ScheduleDAO
+' ── Admin composition (owns DAOs) ──────
+Admin *--> AppointmentDAO
+Admin *--> TimeSlotDAO
+Admin *--> ScheduleDAO
 
-' ReminderService uses DAOs (composition)
-ReminderService *-- AppointmentDAO
-ReminderService *-- UserDAO
+' ── ReminderService composition ────────
+ReminderService *--> AppointmentDAO
+ReminderService *--> UserDAO
+ReminderService *--> Notifier
 
-' DAOs work on domain objects (dependency)
-AppointmentDAO ..> Appointment : <<manages>>
-ScheduleDAO    ..> Schedule    : <<manages>>
-TimeSlotDAO    ..> TimeSlot    : <<manages>>
-UserDAO        ..> User        : <<manages>>
+' ── Observer pattern ───────────────────
+Observer         <|..  EmailObserver
+Notifier         o-->  Observer        : observes (0..*)
+Notifier         ..>   Observer        : <<notifies>>
 
-' DAOs depend on connectDB for Connection
-AppointmentDAO ..> connectDB : <<uses>>
-ScheduleDAO    ..> connectDB : <<uses>>
-TimeSlotDAO    ..> connectDB : <<uses>>
-UserDAO        ..> connectDB : <<uses>>
+' ── Strategy pattern ───────────────────
+BookingRuleStrategy <|..  CapacityRule
+BookingRuleStrategy <|..  DurationRule
+BookingRuleEngine   o-->  BookingRuleStrategy : rules (0..*)
 
-' Domain associations
-Appointment "many" --o "1" User       : createdBy >
+' ── DAO → domain (dependency/manages) ──
+AppointmentDAO ..> Appointment  : <<manages>>
+ScheduleDAO    ..> Schedule     : <<manages>>
+TimeSlotDAO    ..> TimeSlot     : <<manages>>
+UserDAO        ..> User         : <<manages>>
+
+' ── DAOs use connectDB ─────────────────
+AppointmentDAO ..> connectDB    : <<uses>>
+ScheduleDAO    ..> connectDB    : <<uses>>
+TimeSlotDAO    ..> connectDB    : <<uses>>
+UserDAO        ..> connectDB    : <<uses>>
+
+' ── Domain associations ────────────────
+Appointment "many" --o "1"    User     : createdBy >
 Appointment "many" --o "0..1" TimeSlot : linked to >
-TimeSlot    "many" --o "1" Schedule   : belongs to >
+TimeSlot    "many" --o "1"    Schedule : belongs to >
+
+' ── Strategy uses domain ───────────────
+BookingRuleStrategy ..> Appointment : <<validates>>
+BookingRuleEngine   ..> Appointment : <<validates>>
 
 @enduml
