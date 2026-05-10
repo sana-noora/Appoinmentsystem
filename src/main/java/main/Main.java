@@ -100,10 +100,11 @@ public class Main {
     // ================================================================
     private static User loginLoop(UserDAO userDAO) throws SQLException {
         for (int i = 1; i <= 3; i++) {
-            System.out.print("Username : ");
+            logger.info("Prompting for username (Attempt " + i + "/3)");
             String u = sc.nextLine().trim();
-            System.out.print("Password : ");
+            logger.info("Prompting for password for user: " + u + " (Attempt " + i + "/3)");
             String p = sc.nextLine().trim();
+
             Optional<User> opt = userDAO.login(u, p);
             if (opt.isPresent()) {
                 logger.info("Login successful for user: " + u);
